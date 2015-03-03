@@ -1,0 +1,246 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 10.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[      8587,        237]
+NotebookOptionsPosition[      7859,        205]
+NotebookOutlinePosition[      8215,        221]
+CellTagsIndexPosition[      8172,        218]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell["Performance Tests: video-tracking", "Title",
+ CellChangeTimes->{{3.6042065692400007`*^9, 3.604206585576126*^9}}],
+
+Cell[CellGroupData[{
+
+Cell["\<\
+1) Test loading performance based on number of frames being loaded.\
+\>", "Section",
+ CellChangeTimes->{{3.604206617367958*^9, 3.604206645458346*^9}}],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{
+  "video", " ", "=", " ", 
+   "\"\</Users/kmisiunas/Dropbox/PhD/Software/video-tracking/practice_videos/\
+test_video.avi\>\""}], ";"}]], "Input",
+ CellChangeTimes->{{3.6034549438476114`*^9, 3.603454951959422*^9}, 
+   3.603454988688095*^9, {3.604206666225705*^9, 3.604206673609947*^9}, {
+   3.604206834268787*^9, 3.6042068366016273`*^9}}],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"Import", "[", 
+  RowBox[{"video", ",", " ", "\"\<FrameCount\>\""}], "]"}]], "Input",
+ CellChangeTimes->{{3.604206856794169*^9, 3.6042068811481743`*^9}, 
+   3.604206927037704*^9}],
+
+Cell[BoxData["2526"], "Output",
+ CellChangeTimes->{3.604206881652171*^9, 3.60420692778333*^9}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{
+   RowBox[{
+    RowBox[{"LoadNFrames", "[", "n_", "]"}], " ", ":=", " ", 
+    RowBox[{"(", 
+     RowBox[{
+      RowBox[{"Import", "[", 
+       RowBox[{"video", " ", ",", " ", 
+        RowBox[{"{", 
+         RowBox[{"\"\<Frames\>\"", " ", ",", " ", 
+          RowBox[{"Range", "[", 
+           RowBox[{"1000", ",", 
+            RowBox[{"1000", "+", "n"}]}], "]"}]}], "}"}]}], " ", "]"}], ";", 
+      " ", "n"}], ")"}]}], ";"}], 
+  "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
+ RowBox[{"times", " ", "=", " ", 
+  RowBox[{"Table", "[", " ", 
+   RowBox[{
+    RowBox[{"AbsoluteTiming", "[", "  ", 
+     RowBox[{"LoadNFrames", "[", "n", "]"}], " ", "]"}], ",", " ", 
+    RowBox[{"{", 
+     RowBox[{"n", ",", " ", 
+      RowBox[{"{", 
+       RowBox[{
+       "1", ",", "2", ",", "5", ",", "10", ",", "20", ",", "30", ",", "50", 
+        ",", "100", ",", "150", ",", "200", ",", "300", ",", "400", ",", 
+        "500", ",", "600", ",", "700", ",", "800"}], "}"}]}], "}"}]}], 
+   "]"}]}]}], "Input",
+ CellChangeTimes->{{3.6034540769439297`*^9, 3.603454245532787*^9}, {
+  3.6034546327485046`*^9, 3.6034546508603153`*^9}, {3.6034547607523036`*^9, 
+  3.603454768185047*^9}, {3.603454853285556*^9, 3.6034548597562027`*^9}, {
+  3.603455003401566*^9, 3.6034550093461604`*^9}, {3.604206851850903*^9, 
+  3.604206852546023*^9}, {3.604206938016068*^9, 3.604206968022915*^9}, {
+  3.6042071262363577`*^9, 3.604207173457546*^9}}],
+
+Cell[BoxData[
+ TagBox[
+  RowBox[{"(", "\[NoBreak]", GridBox[{
+     {"0.07018499999999999738875544608163181692`4.866844217527486", "1"},
+     {"0.07346099999999999852207110961899161339`4.886656749234528", "2"},
+     {"0.1047550000000000008926193117986258585`5.040774674470091", "5"},
+     {"0.15800300000000000455457893622224219143`5.21926524625352", "10"},
+     {"0.26397999999999999243271986415493302047`5.442170937806024", "20"},
+     {"0.35894799999999998929567368577409069985`5.575631451137116", "30"},
+     {"0.5869269999999999765094571557710878551`5.789184001803756", "50"},
+     {"1.11825100000000010602718703012214973569`6.069139208493903", "100"},
+     {"1.67528199999999993785593233042163774371`6.244687835539384", "150"},
+     {"2.21201999999999987522869560052640736103`6.365388962607751", "200"},
+     {"3.34384699999999979169729158456902951002`6.544846311060995", "300"},
+     {"4.51476800000000011436895874794572591782`6.675235351448854", "400"},
+     {"5.75844700000000031536728783976286649704`6.780905287280971", "500"},
+     {"6.98673799999999989296384228509850800037`6.864874370962523", "600"},
+     {"8.27306199999999947181095194537192583084`6.938266192309887", "700"},
+     {"9.70293099999999952842699713073670864105`7.007502856293263", "800"}
+    },
+    GridBoxAlignment->{
+     "Columns" -> {{Center}}, "ColumnsIndexed" -> {}, "Rows" -> {{Baseline}}, 
+      "RowsIndexed" -> {}},
+    GridBoxSpacings->{"Columns" -> {
+        Offset[0.27999999999999997`], {
+         Offset[0.7]}, 
+        Offset[0.27999999999999997`]}, "ColumnsIndexed" -> {}, "Rows" -> {
+        Offset[0.2], {
+         Offset[0.4]}, 
+        Offset[0.2]}, "RowsIndexed" -> {}}], "\[NoBreak]", ")"}],
+  Function[BoxForm`e$, 
+   MatrixForm[BoxForm`e$]]]], "Output",
+ CellChangeTimes->{3.6034544437286043`*^9, 3.6034546421004395`*^9, 
+  3.6034546951967487`*^9, 3.6034548704812756`*^9, 3.6034551240546303`*^9, 
+  3.604207036243235*^9, 3.604207229343417*^9}]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"timesPerFrame", " ", "=", " ", 
+   RowBox[{"Transpose", "@", " ", 
+    RowBox[{"{", 
+     RowBox[{
+      RowBox[{"times", "[", 
+       RowBox[{"[", 
+        RowBox[{";;", ",", "2"}], "]"}], "]"}], " ", ",", "  ", 
+      RowBox[{
+       RowBox[{"times", " ", "[", 
+        RowBox[{"[", 
+         RowBox[{";;", ",", "1"}], "]"}], "]"}], "/", 
+       RowBox[{"times", " ", "[", 
+        RowBox[{"[", 
+         RowBox[{";;", ",", "2"}], "]"}], "]"}]}]}], " ", "}"}]}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{"ListPlot", "[", "\[IndentingNewLine]", 
+  RowBox[{"timesPerFrame", ",", " ", "\[IndentingNewLine]", 
+   RowBox[{"Joined", "\[Rule]", " ", "True"}], ",", " ", 
+   "\[IndentingNewLine]", 
+   RowBox[{"AxesOrigin", "\[Rule]", 
+    RowBox[{"{", 
+     RowBox[{"0", ",", "0"}], "}"}]}], ",", "\[IndentingNewLine]", 
+   RowBox[{"Frame", "\[Rule]", " ", "True"}], ",", "\[IndentingNewLine]", 
+   RowBox[{"FrameLabel", "\[Rule]", 
+    RowBox[{"{", 
+     RowBox[{
+     "\"\<Number of frames to load\>\"", ",", " ", 
+      "\"\<Time per frame (sec)\>\""}], "}"}]}], ",", " ", 
+   RowBox[{"PlotRange", "\[Rule]", "All"}]}], "]"}]}], "Input",
+ CellChangeTimes->{{3.6034544711853495`*^9, 3.603454617915021*^9}, {
+  3.60420704865492*^9, 3.604207101164524*^9}, {3.604207238379354*^9, 
+  3.604207242045807*^9}}],
+
+Cell[BoxData[
+ GraphicsBox[{{}, 
+   {RGBColor[0.368417, 0.506779, 0.709798], PointSize[0.019444444444444445`], 
+    AbsoluteThickness[1.6], 
+    LineBox[{{1., 0.070185}, {2., 0.0367305}, {5., 0.020951}, {10., 
+     0.0158003}, {20., 0.013198999999999999`}, {30., 0.011964933333333334`}, {
+     50., 0.011738539999999999`}, {100., 0.011182510000000001`}, {150., 
+     0.011168546666666666`}, {200., 0.0110601}, {300., 
+     0.011146156666666665`}, {400., 0.01128692}, {500., 
+     0.011516894000000001`}, {600., 0.011644563333333333`}, {700., 
+     0.01181866}, {800., 0.01212866375}}]}, {}},
+  AspectRatio->NCache[GoldenRatio^(-1), 0.6180339887498948],
+  Axes->{True, True},
+  AxesLabel->{None, None},
+  AxesOrigin->{0., 0.},
+  DisplayFunction->Identity,
+  Frame->{{True, True}, {True, True}},
+  FrameLabel->{{
+     FormBox["\"Time per frame (sec)\"", TraditionalForm], None}, {
+     FormBox["\"Number of frames to load\"", TraditionalForm], None}},
+  FrameTicks->{{Automatic, Automatic}, {Automatic, Automatic}},
+  GridLines->{None, None},
+  GridLinesStyle->Directive[
+    GrayLevel[0.5, 0.4]],
+  Method->{},
+  PlotRange->{All, All},
+  PlotRangeClipping->True,
+  PlotRangePadding->{{
+     Scaled[0.02], 
+     Scaled[0.02]}, {
+     Scaled[0.02], 
+     Scaled[0.02]}},
+  Ticks->{Automatic, Automatic}]], "Output",
+ CellChangeTimes->{{3.604207040651823*^9, 3.604207102862022*^9}, {
+  3.604207232372777*^9, 3.604207242490458*^9}}]
+}, Open  ]]
+}, Open  ]]
+}, Open  ]]
+},
+WindowSize->{808, 656},
+WindowMargins->{{4, Automatic}, {Automatic, 4}},
+FrontEndVersion->"10.0 for Mac OS X x86 (32-bit, 64-bit Kernel) (February 18, \
+2014)",
+StyleDefinitions->"Default.nb"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[580, 22, 118, 1, 92, "Title"],
+Cell[CellGroupData[{
+Cell[723, 27, 160, 3, 115, "Section"],
+Cell[886, 32, 372, 8, 63, "Input"],
+Cell[CellGroupData[{
+Cell[1283, 44, 202, 4, 28, "Input"],
+Cell[1488, 50, 94, 1, 28, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[1619, 56, 1446, 34, 80, "Input"],
+Cell[3068, 92, 1944, 34, 285, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[5049, 131, 1340, 33, 148, "Input"],
+Cell[6392, 166, 1427, 34, 248, "Output"]
+}, Open  ]]
+}, Open  ]]
+}, Open  ]]
+}
+]
+*)
+
+(* End of internal cache information *)
