@@ -83,7 +83,7 @@ UpdateBackgroung[ids_]:=
   UpdateBackgroung @ Quiet @ Check[ 
     OptionValue[VideoTracking,BackgroundAlgorithm] @ ids , 
         Print@"Algorithm Failed: falling back to mean background algorithm.";
-        MeanBackground @ ids
+        MedianBackground @ ids
     ];
 
 UpdateBackgroung[from_Integer,to_Integer]:= UpdateBackgroung @ Range[from, to];
@@ -92,6 +92,8 @@ UpdateBackgroung[from_Integer,to_Integer]:= UpdateBackgroung @ Range[from, to];
 UpdateBackgroung[] := UpdateBackgroung[1, NumberOfFrames[]];
 
 MeanBackground[range_] := Image @ Mean[ ImageData /@ (GetFrame /@ range) ]
+
+MedianBackground[range_] := Image @ Median[ ImageData /@ (GetFrame /@ range) ]
 
 (*  Algorithm averages not moving parts of the image over many frames
     Not buffered to allow mean image for large video files that are sparsly sampled
