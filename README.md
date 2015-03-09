@@ -7,7 +7,7 @@ Extensive notes can be found in Evernote under "Particle Tracking"
 
 ## Description
 
-Routines for detecting particles in diffusion experiments and extracting their sub-pixel positions. 
+Routines for detecting particles in diffusion experiments and extracting their sub-pixel positions. Code written in Mathematica 10.
 
 ## Structure
 

@@ -14,10 +14,13 @@
 (*Version 2 (2014-04-29) - introduced "quality" parameter that gives 
   the probability of the fit being correct.*)
 (*Version 2.1 (2015-03-01) - trim output precision to reflect limited accuracy of sub pixel fit*)
+(*Version 3 (2015-03-06) - Output restructured: {x,y, correctness, size, angle, flattening}
+                           Changed ImageToList to have index from 1
+                           Updated the sub pixel fitting routines 
+                           Added ExpandBox[] method because Gaussian fitting prefers larger areas *)
 
-
-(*Specs:*)
-(* - returned position should start with coordinates (0,0) :*)
+(*== Specs ==*)
+(* Output: List of {x,y, correctness, size*, angle*, flattening*} *)
 
 (* ::Section:: *)
 (* Package Declarations*)
@@ -27,13 +30,13 @@ BeginPackage["SubPixelFit`"]
 
 (* ---  Declarations  --- *)
 
-BoundParticleImg::usage = ""
+ImageToList::usage = "gives image as a list {x,y, intensity}"
 
-ImageToList::usage = ""
+FitSubPixel::usage = "FitSubPixel[img_, box_] fits a sub pixel routine to the particle inside the box"
 
-FitSubPixel::usage = ""
-
-ForFitSubPixel::usage = ""
+ForallFitSubPixel::usage = 
+  "ForallFitSubPixel[img_Image, binImg_Image, ids_] finds multiple sub-pixel resolution peaks 
+  (Automatic box selection - optimised for multiple particles)"
 
 
 (* ::Section:: *)
@@ -45,64 +48,105 @@ Begin["`Private`"]
 (* ::Section:: *)
 (*Implementation*)
 
-BoundParticleImg[img_Image, binImg_Image, id_Integer] := 
- ImageTrim[ 
-  img, (id /. ComponentMeasurements[binImg, "BoundingBox"]) ]
-
 ImageToList[img_Image] := 
- Flatten[MapIndexed[{#2[[2]] - 1, #2[[1]] - 1, #1} &, 
+ Flatten[MapIndexed[{#2[[2]], #2[[1]], #1} &, 
    Reverse[ImageData[img, "Byte"], 1], {2}], 1] 
 
 
-FitSubPixel[img_, box_] := SubPixel2DGaussianFixedFit[ ImageTrim[ img, box ] ]
+FitSubPixel[img_Image, box_] := 
+  GetPosition[ SPFGaussianOptimised@ImageTrim[ img, # ], # ] &@ box
 
-GetPosition[fit_, box_] := N@Round[ ("pos" /. fit) + box[[1]] , 0.001]
+(*private: absolute position of particles in the frames*)
+GetPosition[res_, box_] := N@Round[  (res[[{1,2}]] + box[[1]]) ~ Join ~ res[[3;;]] , 0.01]
 
-SelectQualityFit[fit_, box_] := If[ ("quality"/.fit) < 0.75, {}, GetPosition[fit, box] ]
+(*todo: add judgement on box size!*)
+ForallFitSubPixel[img_Image, binImg_Image, ids_] := 
+  FitSubPixel[img, ExpandBox[#,1]] &/@ (ids /. ComponentMeasurements[binImg, "BoundingBox"])
 
-ProcessOneBox[img_Image, box_] := SelectQualityFit[ FitSubPixel[img, box], box]
+(*private: method expands bounding box*)
+ExpandBox[box_, add_] := {
+  { Max[ 0, box[[1,1]] - add ] , Max[ 0, box[[1,2]] - add ] },
+  box[[2]] + {add, add} (*ImageTrim handles larger boxes automatically*)
+} 
 
-ForFitSubPixel[img_Image, binImg_Image, ids_] := Select[
-  ProcessOneBox[img, #] &/@ (ids /. ComponentMeasurements[binImg, "BoundingBox"]),
-  Length@# > 0 & 
-]
 
-(*main method*)
-SubPixel2DGaussianFixedFit[img_Image] := 
- Module[ {data, fit, performFit, a, y, x, mx, my, b, sx, sy},
-  data = ImageToList[img] ;
-  performFit :=  NonlinearModelFit[data, 
-    a Exp@(-(-my + y)^2/(2 (sy^2) ) - (-mx + x)^2/(2 sx^2)), 
-    {{a, Max@data}, 
-     {mx, ImageDimensions[img][[1]]/2}, 
-     {my, ImageDimensions[img][[2]]/2}, 
-     {sx, ImageDimensions[img][[1]]/2}, 
-     {sy, ImageDimensions[img][[2]]/2}},
-    {x, y}];
 
-  fit = Quiet[Check[ performFit , $Failed]];
-  If[fit===$Failed, Null , {mx, my, sx, sy} = {mx, my, sx, sy} /. fit["BestFitParameters"]];
+(*Main fitting methods - tested on 2015-03-06*)
 
-  { "pos" -> {mx, my},
-    "quality" -> (*check fit success, chech that is within image, check that has reasonable parameters*)
-      If[ fit === $Failed , 0,
-      If[ mx <= 0 || mx >= ImageDimensions[img][[1]] || my <= 0 || my >= ImageDimensions[img][[2]], 0,
-      If[ sx > 0.66*ImageDimensions[img][[1]] || sy > 0.66*ImageDimensions[img][[2]], 0, 
-      (*Else return*) 1 ]]]
+SPFGaussianFixed[img_Image] := Block[
+  {data, fit, performFit, a, y, x, mx, my, s, dimensions, 
+   failedResults},
+  data = ImageToList[img];
+  dimensions = ImageDimensions[img];
+  performFit := FindFit[data,
+    a Exp@(-(-my + y)^2/(2 (s^2)) - (-mx + x)^2/(2 s^2)),
+    {{a, Max@data}, {mx, dimensions[[1]]/2}, {my, 
+      dimensions[[2]]/2}, {s, Mean@dimensions/2}}, {x, y},
+    AccuracyGoal -> 3, PrecisionGoal -> 3];
+  failedResults := {dimensions[[1]]/2 , dimensions[[2]]/2, 0 , 
+    dimensions[[2]]/2};
+  fit = Quiet[Check[performFit, Return@failedResults]];
+  {mx, my, s} = {mx, my, s} /. fit ;
+  (*deal with errors*)
+  
+  If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || 
+    my >= dimensions[[2]] || s > 0.66*Mean@dimensions, 
+   Return@failedResults];
+  (*format the reply*)
+  {mx - 0.5, my - 0.5,
+   (*fit quality*)
+   1,
+   (*size*)
+   Abs[s]
    }
   ]
 
-
-SubPixel2DGaussianSimpleFit[img_Image] := 
- Module[ {data, fit, a, y, x, mx, my, b, s},
-  data = ImageToList[img] ;
-  fit =  NonlinearModelFit[data, 
-    a Exp@(-(-my + y)^2/(2 (s^2) ) - (-mx + x)^2/(2 s^2)), {{a, 
-      Max@data}, {mx, ImageDimensions[img][[1]]/2}, {my, 
-      ImageDimensions[img][[2]]/2}, {s, 3}},
-    {x, y}];
-  {"pos" ->
-     {mx, my} /. fit["BestFitParameters"]
+SPFGaussianOptimised[img_Image] := Block[
+  {data, fit, performFit, a, angle, y, x, mx, my, sx, sy, dimensions, 
+   p, mx0, my0},
+  data = ImageToList[img];
+  dimensions = ImageDimensions[img];
+  (*find early position guess - centroid*)
+  p = data[[All, 3]] // N;
+  p /= Total[p];
+  mx0 = data[[All, 1]]~Dot~p;
+  my0 = data[[All, 2]]~Dot~p;
+  (*define fit*)
+  performFit := FindFit[data,
+    a E^(-(((-my + y) Cos[angle] - (-mx + x) Sin[
+                angle])^2/(2 sy^2)) - ((-mx + x) Cos[
+              angle] + (-my + y) Sin[angle])^2/(2 sx^2)),
+    {{a, Max@data}, {angle, 0.0}, {mx, mx0}, {my, my0}, {sx, 
+      dimensions[[1]]/2}, {sy, dimensions[[2]]/2}}, {x, y},
+    AccuracyGoal -> 3, PrecisionGoal -> 3];
+  (*fit*)
+  fit = Quiet[Check[performFit, $Failed]];
+  (*if failed use simpler routine to find at least the positions*)
+  
+  If[fit === $Failed, Return@SPFGaussianFixed[img] ];
+  {mx, my, sx, sy, angle} = {mx, my, sx, sy, angle} /. fit ;
+  (*check parameters - if off use simpler routine*)
+  
+  If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || 
+    my >= dimensions[[2]] || sx > 0.77*dimensions[[1]] || 
+    sy > 0.77*dimensions[[2]],
+    Return@SPFGaussianFixed[img] ];
+  If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || 
+    my >= dimensions[[2]] || sx > 0.77*dimensions[[1]] || 
+    sy > 0.77*dimensions[[2]],
+    Print@"you should never read this message"];
+  (*format the otput*)
+  {
+   (*position*)
+   mx - 0.5, my - 0.5,
+   (*fit quality*)
+   1 (*bad one elliminated for tother routines*),
+   (*size*)
+   Sqrt@Abs[sx *sy],
+   (*angle*)
+   Mod[If[sx > sy, angle, angle + Pi/2.0], N@Pi],
+   (*flattening*)
+   1.0 - Abs@If[sx > sy, sy/sx, sx/sy]
    }
   ]
 
