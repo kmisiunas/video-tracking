@@ -10,7 +10,7 @@
 
 (* ::Text:: *)
 (*This package aims to manage video import buffering and saving*)
-(*Version 1.0 (2015-03-09) - Exported from VideoIO.m package 
+(*Version 2.0 (2015-03-09) - Exported from VideoIO.m package 
                              Compatibility with Mathematica's region specification*)
 
 (* ==Specs== *)

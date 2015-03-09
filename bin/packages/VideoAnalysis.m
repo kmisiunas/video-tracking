@@ -55,7 +55,7 @@ VideoFindThreshold[range_] := Module[ {binList,MeanBinPlace,hist,peaks, thePeak}
     Graphics[{Red, PointSize@Large , Point[{#, 0.05}]&/@peaks}],
     ImageSize -> Medium
     ],
-   "Recomended Threshold value is " <> ToString@thePeak
+   "Recommended Threshold value is " <> ToString@thePeak
    }]];
    (*return*)
   thePeak

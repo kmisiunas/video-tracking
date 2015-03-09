@@ -16,7 +16,7 @@
 (* Package Declarations*)
 
 
-BeginPackage["VideoTracking`",{"VideoIO`", "SubPixelFit`", "VideoSupportUI`", "FFmpeg`", "VideoAnalysis`"}]
+BeginPackage["VideoTracking`", {"VideoIO`", "SubPixelFit`", "VideoSupportUI`", "FFmpeg`", "VideoAnalysis`"}]
 
 
 SubstractBG::usage = 
