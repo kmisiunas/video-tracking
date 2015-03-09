@@ -10,16 +10,18 @@
 
 (* ::Text:: *)
 (*This package aims to manage video import buffering and saving*)
-(*Version 1 (2014-02-19) - initial release. *)
+(*Version 1.0 (2014-02-19) - initial release. *)
 (*Version 1.1 (2014-11-06) - improved performance for selecting ROI. *)
+(*Version 2.0 (2015-03-09) - Renamed functions sot he first name indicates idea space: ROI..., Video...
+                             Produces Frame id counter - and scans for id where possible 
+                             ROI.m exported as separate package *)
 
-(* ::Plan for v2::*)
+(* ::Plan for future::*)
 (*
   1. Add multiple ROIs or images by having packs. If not specified - use default 
   2. Deal with stream: GetNextFrame[], NextFrameQ[], SetNextFrame[]
   3. Load video persistence techniques: combine old method with load entire video. 
-
-
+  4. Add Frame number reading to all Frame loading routines
 *)
 
 
@@ -27,70 +29,53 @@
 (* Package Declarations*)
 
 
-BeginPackage["VideoIO`", {"FFmpeg`"}]
+BeginPackage["VideoIO`", {"FFmpeg`", "VideoAnalysis`", "ROI`"}]
 
-(* ---  ROI functions  --- *)
-
-SelectROI::usage = 
-		"UI for Region Of Intrest selection"
-
-ShowROI::usage = 
-		"ShowROI[roi_: videoROI, frame_Int: 1] shows ROI on current video file"
-
-ImageTakeROI::usage = 
-		"ImageTakeROI[img_, roi_:ROICurrent]  returns a smaller image that was cut with rectangular ROI (not final!)"
-
-CreateRectROI::usage = 
-		"CreateRectROI[pos_, size_] creates a rectangulat Region Of Intrest"
 
 (* ---  Get Frame functions  --- *)
 
-SelectVideo::usage = 
-		"SelectVideo[file] loads the video file into analysis.
-		If file is ommited, it will bring dialog."
 
-SelectVideo::nofile = "file does not exist.";
+VideoGet::usage = 
+  "VideoGet[no_ || range_] returns a buffered video frame that was cut to ROICurrent[]. 
+  Can pass a flag \"NoBuffer\" to have unbuffered read from file."
 
-GetRawFrames::usage = 
-  "GetRawFrames[range_] loads frames without the buffer"
+VideoGetRaw::usage = 
+  "VideoGetRaw[no_ || range_] loads a frame straight from VideoFile[] file with no processing"  
 
-GetFrames::usage =
-  "Returns a list of frames from \"videoFile\" video and cuts it using videoROI"
+VideoFrameID::usage =
+  "VideoFrameID[no_(optional)] returns id of a frame or full list of them. 
+  (if there was none set by video will give 1..VideoLength[])"
 
-GetFrame::usage = 
-	"Get a buffered frame from VideoTracking`videoFile"
+VideoFile::usage = "the video file under analysis"
 
-RawVideoDimmensions::usage = 
-	"returns size of input video"
+VideoSelect::usage = 
+		"VideoSelect[file] loads the video file into analysis.
+		If file is omitted, it will bring dialogue."
 
-NumberOfFrames::usage =
-  "Returns number of frames in video file \"videoFile\""
+VideoSelect::nofile = "file does not exist.";
 
-ClearBuffer::usage =
-  "ClearBuffer[] clears entire buffered data"
+VideoBufferAll::usgae = 
+  "VideoBufferAll[] attempts to buffer all the images in to the memory (efficiently)"
 
-LoadAllFrames::usage =
-  "LoadAllDrames[] loads all frames to the memory"
+VideoClearBuffer::usage =
+  "VideoClearBuffer[] clears entire buffered data"
+
+VideoDimmensionsRaw::usage = 
+  "VideoDimmensionsRaw[] returns size of input video before it was cut"
+
+VideoLength::usage =
+  "VideoLength[] returns number of frames in buffered video"
+
 
 
 (* ---  Global variables functions  --- *)
 
-VideoFile::usage = 
-	"the video file under analysis"
-
-ROICurrent::usage = 
-	"active region of intrest for the analysis {{x0,y0},{x1,y1}}."
-
-ROIFullImage::usage = 
-	"roi encapsulation the entire image"
-
 (* options associated with analysis *)
 Options[VideoIO] = { 
   "BufferSizeMB" -> 1000 (*number of frames to store in the buffer*),
-  "BufferBlockSize" -> 400 (*number of frames to load into memory at one time *)
+  "BufferBlockSize" -> 400 (*number of frames to load into memory at one time *),
+  "FrameIdFromFrame" -> False (*frame top left corner has frame id *)
 }
-
-CutFrame::usage = "todo"
 
 (* ::Section:: *)
 (*Package Implementations - Public*)
@@ -98,20 +83,65 @@ CutFrame::usage = "todo"
 
 Begin["`Private`"]
 
+
 (* ::Section:: *)
-(*GetFrame and Buffering*)
+(*Get frames Implementations*)
+
+(*initial values*)
+videoFile = ""; numberOfFrames = 0; framesIds = {};
+{widthRaw, heightRaw} = {0,0};
+
+VideoFile[] := videoFile
+
+VideoSelect[file_String] := 
+	If[ FileExistsQ@file, PrepareVideoInput[file],	Message[VideoSelect::nofile, file] ]
+VideoSelect[] := VideoSelect[ SystemDialogInput["FileOpen", Directory[]] ]
+
+PrepareVideoInput[file_String] := Module[ {img},
+  numberOfFrames = FFImport[file,{"FrameCount"}]; (*todo: make sure it works!*)
+  videoFile = file;
+  img = VideoGetRaw[1];
+  {widthRaw, heightRaw} = ImageDimensions[img];
+  framesIds = Range@numberOfFrames;
+  VideoClearBuffer[];
+  FileNameTake[file] <> " has "<>ToString@numberOfFrames <> 
+    " frames and is "<> ToString@widthRaw <>"x"<>ToString@heightRaw
+]
+
+VideoLength[] := numberOfFrames
+
+VideoDimmensionsRaw[] := {widthRaw, heightRaw}
+
+(*todo: check, it seems odd that there is ";" in if statement*)
 
 (* Descrption:
     The buffer loads croped images into the memory - it does that in a separate processor *)
-
-GetFrame[frame_] := (
+VideoGet[frame_Integer] := (
   If[ ! BufferContainsQ[frame] , AskBufferFor[frame] ];
   bufferVideo[[ WhichBlock[frame], frame - (WhichBlock[frame] - 1)*blockSize ]]
 )
 
+VideoGet[range_?VectorQ] := VideoGet/@range
+VideoGet[frame_Integer, "NoBuffer"] := CutFrame@VideoGetRaw@frame
+
+VideoGetRaw[frame_Integer] := FFImport[ VideoFile[], {"Frames",frames} ]
+VideoGetRaw[range_?VectorQ] := FFImport[ VideoFile[], {"Frames",range} ]
+
+(*todo: check for updated ROI*)
+
+CutFrame[img_Image] := ColorConvert[ ImageTake[img, ROICurrent[]], "Grayscale"]
+
+
+VideoFrameID[] := framesIds
+VideoFrameID[no_Integer] := framesIds[[no]]
+
+(* ::Section:: *)
+(*Buffering*)
+
+
 WhichBlock[frame_] := Ceiling[ (frame - 0.5)/blockSize ]
 
-ClearBuffer[] := Module[ {} ,
+VideoClearBuffer[] := Module[ {} ,
   Clear[bufferVideo];
   (*prepare for new*)
   blockSize = OptionValue[VideoIO, BufferBlockSize];
@@ -129,7 +159,7 @@ AskBufferFor[frame_] := If[ bufferVideo[[ WhichBlock @ frame ]] == {} , LoadBuff
 LoadBufferBlock[frame_] := Module[{from, to},
   If[ BufferMemorySize[] > OptionValue[VideoIO, BufferSizeMB] , MakeSpaceInBuffer[] ];
   from = Floor[frame - 0.5, blockSize] + 1 ;
-  to = Min[ Ceiling[frame - 0.5, blockSize] , NumberOfFrames[] ] ;
+  to = Min[ Ceiling[frame - 0.5, blockSize] , VideoLength[] ] ;
   PrintTemporary @ ("Buffer: loading frame block: ["<>ToString@from<>", "<> ToString@to<>"]");
   bufferVideo[[ WhichBlock @ frame ]] = GetFrames @ Range[from, to] ;
   bufferVideoTimeStamp[[ WhichBlock @ frame ]] = AbsoluteTime[];
@@ -149,21 +179,26 @@ MakeSpaceInBuffer[] := Module[ {oldestBlockId, creationDates},
 BufferContainsQ[frame_] := bufferVideoTimeStamp[[ WhichBlock @ frame ]] > 0 
 
 (*loads all frames using ffmpeg!*)
-LoadAllFrames[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfFrames},
+VideoBufferAll[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfFrames, processFrame, images},
   size = OptionValue[VideoIO, BufferBlockSize];
   expectedNoOfFrames = FFImport[ VideoFile[], "FrameCount"];
   {stream, dim} = FFInputStreamAt[ VideoFile[], 1, All]; (*might cause error because of order!*)
+
+  If[ OptionValue[VideoIO, "FrameIdFromFrame"], (*try reading frame ids along the way?*)
+    processFrame[img_Image] := { CutFrame@img, VideoReadFrameID[img] },
+    processFrame[img_Image] := { CutFrame@img, 0 }  (*no frame info place holder*)
+  ]
 
   res = 
     Reap @ Catch @ Do[ (*run though entire file til there is no frames*)
       Quiet @ Check[ 
         If[ Divisible[i,500], PrintTemporary["Buffer: loaded "~~ToString@i~~" frames"] ];
-        Sow[ CutFrame @ FFGetNextFrame[stream, dim] ]
+        Sow[ processFrame@FFGetNextFrame[stream, dim] ]
         , Throw[i-1] ],
-      {i, NumberOfFrames[]}
+      {i, VideoLength[]}
     ];
-
-  newFrameCount = Length@res[[2,1]] - 1;
+  images = res[[2,1,;;,1]];
+  newFrameCount = Length@images;
   Print["Buffer: expected " ~~ ToString@expectedNoOfFrames ~~ 
         " frames. ffmpeg found " ~~ ToString@newFrameCount ];
   (*warn if the difference is very large*)
@@ -172,178 +207,13 @@ LoadAllFrames[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfFr
   ];
   numberOfFrames = newFrameCount; (*update number of frames*)
   (*update buffer*)
-  bufferVideo = Partition[ res[[2,1]] , size, size, 1, {}];
+  bufferVideo = Partition[ images , size, size, 1, {}];
   bufferVideoTimeStamp[[ ;; Length@bufferVideo ]] = AbsoluteTime[];
   Close[stream];
+  (*update framesIds*)
+  framesIds = If[ OptionValue[VideoIO, "FrameIdFromFrame"], res[[2,1,;;,2]], Range@VideoLength[] ];
   Print @ "Buffer: loaded entire video";
 ]
-
-
-
-(* ::Section:: *)
-(*Get frames Implementations*)
-
-videoFile := ""
-
-SelectVideo[] := SelectVideo[ SystemDialogInput["FileOpen", Directory[]] ]
-
-SelectVideo[file_String] := 
-	If[ FileExistsQ @ file, 
-		PrepareVideoInput[file],
-		Message[SelectVideo::nofile, file] ]
-
-PrepareVideoInput[file_String] := Module[ {img},
-  numberOfFrames = Import[file,{"FrameCount"}];
-  videoFile = file;
-  img = GetRawFrames[1][[1]];
-  widthRaw = ImageDimensions[img][[1]]; 
-  heightRaw = ImageDimensions[img][[2]]; 
-  ClearBuffer[];
-  FileNameTake[file] <> " has "<>ToString@numberOfFrames <> 
-    " frames and is "<> ToString@widthRaw <>
-    "x"<>ToString@heightRaw
-]
-
-VideoFile[] := videoFile
-
-NumberOfFrames[] := numberOfFrames
-
-(*consider improving performance here *)
-GetFrames[frames_] := CutFrame /@ GetRawFrames [ frames ]
-
-GetRawFrames[frames_] := Flatten[ {FFImport[videoFile,{"Frames",frames}]} , 1]
-
-GetRawFrames2[frames_] := Flatten[ {FFImport[videoFile,{"Frames",frames, True}]} , 1]
-
-CutFrame[img_Image] := ColorConvert[ ImageTakeROI[img, ROICurrent[]], "Grayscale"]
-
-ROIDimmensions[] := 
-  { (Max@# - Min@#) &@ROICurrent[][[;; , 1]],
-    (Max@# - Min@#) &@ROICurrent[][[;; , 2]] }
-
-RawVideoDimmensions[] := {widthRaw, heightRaw}
-
-
-(* ::Section:: *)
-(*ROI function implementations*)
-
-
-currentROI := ROIFullImage[]
-
-ROICurrent[] := currentROI
-
-ROIFullImage[] := {{0,heightRaw}, {widthRaw,heightRaw}, {widthRaw,0},{0,0}}
-
-
-ShowROI[roi_, img_] := Module[
-  {height, width, com},
-  {width, height} = ImageDimensions@img;
-  com = Mean /@ {roi[[;; , 1]], roi[[;; , 2]]};
-  Show[
-   img, 
-   Graphics[{Red, Line@Append[roi, roi[[1]] ], Point /@ roi,
-     (*center of mass *)
-     Orange,
-     Line@{com - {10, 0}, com + {10, 0}},
-     Line@{com - {0, 10}, com + {0, 10}}
-     }],
-   ImageSize -> Medium]
-  ]
-
-ShowROI[roi_: ROICurrent[], frame_Integer: 1] := ShowROI[roi, VideoBufferedImport[frame]];
-
-bufferVideoSingleCmd = {};
-
-(*buffered load of image*)
-VideoBufferedImport[input_] := If[input === bufferVideoSingleCmd,
-	bufferVideoSingle,
-	bufferVideoSingle = Import[videoFile, {"Frames", input}]
-]
-
-SelectROI[] := Module[
- {width, height, img, pos},
-
- {width, height, pos} = If[ROICurrent[] === ROIFullImage[],
-   {100, 20, RawVideoDimmensions[]/2},
-   {(Max@# - Min@#) &@ROICurrent[][[;; , 1]],
-    (Max@# - Min@#) &@ROICurrent[][[;; , 2]],
-    {(Mean@#) &@ROICurrent[][[;; , 1]],
-     (Mean@#) &@ROICurrent[][[;; , 2]]}}
-   ];
- img = FFImport[VideoFile[], {"Frames", 1}];
- 
- DialogInput[DialogNotebook[
-   {
-    Button["Select ROI",
-     DialogReturn@
-      SelectROI@CreateRectROI[Round@pos, {width, height}]],
-
-
-    Panel[ Grid@Transpose@{{
-         Row[{
-           Panel@Grid[{
-              {TextCell["ROI Position"]},
-              {"x", 
-               Manipulator[
-                Dynamic@pos[[1]], {1, RawVideoDimmensions[][[1]], 
-                 1}], Dynamic@pos[[1]]},
-              {"y", 
-               Manipulator[
-                Dynamic@pos[[2]], {1, RawVideoDimmensions[][[2]], 
-                 1}], Dynamic@pos[[2]]}
-              }] ,
-           Panel@Grid[{
-              {TextCell["ROI dimmensions"]},
-              {"width", 
-               Manipulator[
-                Dynamic@width, {1, RawVideoDimmensions[][[1]], 1}], 
-               Dynamic@width},
-              {"height", 
-               Manipulator[
-                Dynamic@height, {1, RawVideoDimmensions[][[2]], 1}], 
-               Dynamic@height}
-              }]
-           }, " "],
-
-         (*image and bounds + (optional) Locator*)
-         Dynamic@Show[
-           ShowROI[CreateRectROI[Round@pos, {width, height}] , img],
-           (*Graphics[Locator[Dynamic@pos2]],*)
-           
-           ImageSize -> Large
-         ],
-
-         (* small image of croped area*)
-        Dynamic@Show[
-          ImageTakeROI[img, 
-            CreateRectROI[Round@pos, {width, height}]],
-              ImageSize -> Small
-        ]
-         
-      }}]
-    },
-   
-   WindowTitle -> "Select Region Of Intrest"
-   ]
-  ]
- ]
-
-SelectROI[roi_] := Module[{}, 
-  currentROI = roi;
-  ClearBuffer[];
-  roi 
-] 
-
-(*designed for ordered ROI from Top-Left clockwise *)
-ImageTakeROI[img_, roi_] := 
-	ImageTake[img, heightRaw - {roi[[1,2]],roi[[3,2]]}, {roi[[1,1]],roi[[3,1]]}]
-
-CreateRectROI[pos_, size_] := {
-	{pos[[1]] - Floor[size[[1]]/2], 	pos[[2]] + Ceiling[size[[2]]/2]},
-	{pos[[1]] + Ceiling[size[[1]]/2], 	pos[[2]] + Ceiling[size[[2]]/2]},
-	{pos[[1]] + Ceiling[size[[1]]/2], 	pos[[2]] - Floor[size[[2]]/2]},
-	{pos[[1]] - Floor[size[[1]]/2], 	pos[[2]] - Floor[size[[2]]/2]}  
-  }
 
 (* ::Section:: *)
 (*The End*)

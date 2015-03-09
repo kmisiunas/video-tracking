@@ -27,8 +27,8 @@ VideoFindThreshold::usage =
 VideoFindActiveFrames::usage =
   "VideoFindActiveFrames[scanDensity_= auto] shows where active frames are inside the video"
 
-VideoFrameID::usage =
-    "VideoFrameID[image_] returns video frame ID from 4 pixels in top right corrner of a frame"
+VideoReadFrameID::usage =
+    "VideoReadFrameID[image_] returns video frame ID from 4 pixels in top right corrner of a frame"
 
 Begin["`Private`"]
 
@@ -78,10 +78,10 @@ VideoFindActiveFrames[scanDensity_Integer] := Module[
 
 VideoFindActiveFrames[] := VideoFindActiveFrames[ Round[ NumberOfFrames[]/1000 ]]
 
-(*============ VideoFrameID =============*)
+(*============ VideoReadFrameID =============*)
 
 toInt[acc_, add_] := acc*256 + add;
-VideoFrameID[image_Image] :=
+VideoReadFrameID[image_Image] :=
     Fold[ toInt, 0, Reverse @ PixelValue[image, {1;;4, ImageDimensions[image][[2]] }, "Byte"] ]
 
 (* ::Section:: *)
