@@ -28,7 +28,10 @@ VideoFindActiveFrames::usage =
   "VideoFindActiveFrames[scanDensity_= auto] shows where active frames are inside the video"
 
 VideoReadFrameID::usage =
-    "VideoReadFrameID[image_] returns video frame ID from 4 pixels in top right corrner of a frame"
+  "VideoReadFrameID[image_] returns video frame ID from 4 pixels in top right corrner of a frame"
+
+VideoDetectVibrations::usage = 
+  "VideoDetectVibrations[] first call initiates the routine, second call returns vibration count on raw frames"
 
 Begin["`Private`"]
 
@@ -43,7 +46,8 @@ VideoFindThreshold[range_] := Module[ {binList,MeanBinPlace,hist,peaks, thePeak}
   MeanBinPlace[data_] := { (data[[1, 2 ;;]] + data[[1, ;; -2]])/2 , data[[2]] };
   hist = N@Transpose@MeanBinPlace@HistogramList@binList;
   (*find peaks*)
-  peaks = Interpolation[ Transpose@{ Range@Length@hist, hist[[;; , 1]]}] /@ (FindPeaks@hist[[;; , 2]])[[;;,1]];
+  peaks = Interpolation[ 
+    Transpose@{ Range@Length@hist, hist[[;; , 1]]}] /@ (FindPeaks@hist[[;; , 2]])[[;;,1]  ];
   (*select one peak*)
   thePeak = Last@peaks;
   (*show report*)
@@ -83,6 +87,11 @@ VideoFindActiveFrames[] := VideoFindActiveFrames[ Round[ NumberOfFrames[]/1000 ]
 toInt[acc_, add_] := acc*256 + add;
 VideoReadFrameID[image_Image] :=
     Fold[ toInt, 0, Reverse @ PixelValue[image, {1;;4, ImageDimensions[image][[2]] }, "Byte"] ]
+
+
+(*============ VideoDetectVibrations =============*)
+
+VideoDetectVibrations[] := "todo"
 
 (* ::Section:: *)
 (*The End*)

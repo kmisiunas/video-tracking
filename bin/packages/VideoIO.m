@@ -115,7 +115,7 @@ VideoSelect[file_String] :=
 VideoSelect[] := VideoSelect[ SystemDialogInput["FileOpen", Directory[]] ]
 
 PrepareVideoInput[file_String] := Module[ {img, modifyFrameID},
-  numberOfFrames = FFImport[file,{"FrameCount"}]; (*todo: make sure it works!*)
+  numberOfFrames = FFImport[file,{"FrameCount"}]; 
   videoFile = file;
   img = VideoGetRaw[1];
   {widthRaw, heightRaw} = ImageDimensions[img];
@@ -133,10 +133,9 @@ VideoLength[] := numberOfFrames
 
 VideoDimmensionsRaw[] := {widthRaw, heightRaw}
 
-(*todo: check, it seems odd that there is ";" in if statement*)
-
 (* Descrption:
-    The buffer loads croped images into the memory - it does that in a separate processor *)
+    The buffer loads cropped images into the memory - it does that in a separate processor 
+    Performance wise this might not be the smartest way *)
 VideoGet[frame_Integer] := (
   If[ ! BufferContainsQ[frame] , AskBufferFor[frame] ];
   bufferVideo[[ WhichBlock[frame], frame - (WhichBlock[frame] - 1)*blockSize ]]

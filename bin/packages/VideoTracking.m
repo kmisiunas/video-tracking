@@ -158,6 +158,7 @@ RunAnalysis[from_:1, to_: NumberOfFrames[]] := Module[
 
 GetPositions[img_] := SelectParticles[img] /. ComponentMeasurements[img, "Centroid"]
 
+(*slow! todo: collect measurements *)
 SelectParticles[img_] := Intersection[ 
     FilterSize[img, OptionValue[VideoTracking, FilterArea] ]  
     ,FilterCircularity[img, OptionValue[VideoTracking, FilterCircularity] ]

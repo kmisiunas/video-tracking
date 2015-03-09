@@ -68,7 +68,6 @@ ROISelect[roi_?ROIQ] := Module[{},
   roi 
 ] 
 
-(*todo: update*)
 ROISelect[] := Module[
  {width, height, img, pos},
 
