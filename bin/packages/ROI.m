@@ -42,6 +42,8 @@ ROIFullImage::usage =
 ROIQ::usage = 
   "ROIQ[roi_] returns True if input is formatted as ROI"
 
+ROIDimmensions::usage = 
+  "ROIDimmensions[] gives width and height of ROI"
 
 (* ::Section:: *)
 (*Package Implementations - Public*)
@@ -54,11 +56,9 @@ Begin["`Private`"]
 (*ROI function implementations*)
 
 
-currentROI := ROIFullImage[]
+currentROI = {{0,0}, {0,0}}; 
 
 ROICurrent[] := currentROI
-
-ROIFullImage[] := {{0,0}, {widthRaw,heightRaw}};
 
 ROIQ[roi_] := MatchQ[roi, {{_Integer, _Integer}, {_Integer, _Integer}}]
 
@@ -69,16 +69,13 @@ ROISelect[roi_?ROIQ] := Module[{},
 ] 
 
 ROISelect[] := Module[
- {width, height, img, pos},
+  {width, height, img, pos, rawWidth, rawHeight}, 
 
- {width, height, pos} = If[ROICurrent[] === ROIFullImage[],
-   {100, 20, RawVideoDimmensions[]/2},
-   {(Max@# - Min@#) &@ROICurrent[][[;; , 1]],
-    (Max@# - Min@#) &@ROICurrent[][[;; , 2]],
-    {(Mean@#) &@ROICurrent[][[;; , 1]],
-     (Mean@#) &@ROICurrent[][[;; , 2]]}}
-   ];
- img = VideoGetRaw[1];
+  img = VideoIO`VideoGetRaw[1];
+  {rawWidth, rawHeight} = ImageDimensions[img];
+  {width, height} = ROIDimmensions@ROICurrent[];
+  pos = Round[ (ROICurrent[][[1]] + ROICurrent[][[2]])/2 ];
+
  
  DialogInput[DialogNotebook[
    {
@@ -92,22 +89,22 @@ ROISelect[] := Module[
               {"x", 
                Manipulator[
                 Dynamic@pos[[1]], 
-                {1, VideoDimmensionsRaw[][[1]], 1}], Dynamic@pos[[1]]},
+                {1, rawWidth, 1}], Dynamic@pos[[1]]},
               {"y", 
                Manipulator[
                 Dynamic@pos[[2]], 
-                {1, VideoDimmensionsRaw[][[2]], 1}], Dynamic@pos[[2]]}
+                {1, rawHeight, 1}], Dynamic@pos[[2]]}
               }] ,
            Panel@Grid[{
               {TextCell["ROI dimmensions"]},
               {"width", 
                Manipulator[
                 Dynamic@width, 
-                {1, VideoDimmensionsRaw[][[1]], 1}], Dynamic@width},
+                {1, rawWidth, 1}], Dynamic@width},
               {"height", 
                Manipulator[
                 Dynamic@height, 
-                {1, VideoDimmensionsRaw[][[2]], 1}], Dynamic@height}
+                {1, rawHeight, 1}], Dynamic@height}
               }]
            }, " "],
 
@@ -121,7 +118,7 @@ ROISelect[] := Module[
 
          (* small image of croped area*)
         Dynamic@Show[
-          ImageTake[ img, ROICreateRect[Round@pos, {width, height}] ],
+          ImageTrim[ img, ROICreateRect[ Round@pos, {width, height}] ],
           ImageSize -> Small
         ]
          
@@ -134,11 +131,12 @@ ROISelect[] := Module[
 
 ROICreateRect[pos_, size_] := Round @ {
   	{pos[[1]] - Floor[size[[1]]/2], 	pos[[2]] - Floor[size[[2]]/2]},
-  	{pos[[1]] + Ceiling[size[[1]]/2], 	pos[[2]] + Ceiling[size[[2]]/2]},
+  	{pos[[1]] + Ceiling[size[[1]]/2], 	pos[[2]] + Ceiling[size[[2]]/2]}
   }
 
 
-ROIDimmensions[roi_?ROIQ:ROICurrent[]] := roi[[2]] - roi[[1]]
+ROIDimmensions[roi_?ROIQ] := roi[[2]] - roi[[1]]
+ROIDimmensions[] := ROIDimmensions[ ROICurrent[] ]
 
 
 ROIShow[roi_, img_Image] := Block[
@@ -149,7 +147,7 @@ ROIShow[roi_, img_Image] := Block[
     img, 
     Graphics[{
       (*contours*)
-      EdgeForm[Red], Opacity[0], Rectangle@@roi, 
+      Opacity[0],EdgeForm[Directive[Red,Opacity[1]]], Rectangle@@roi, 
       (*points indicating bounds*)
       Opacity[1], Red, PointSize[Medium], Point /@ roi,
       (*center of mass *)

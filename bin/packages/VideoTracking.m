@@ -25,9 +25,6 @@ SubstractBG::usage =
 UpdateBackgroung::usage = 
     "updates background image based on specified frames"
 
-GetPositions::usage = 
-    "analyses images and finds positions of colloids if there are any"
-
 FrameBinarize::usage = 
     "binirizes the image, with settings"
 
@@ -89,11 +86,11 @@ UpdateBackgroung[ids_]:=
 UpdateBackgroung[from_Integer,to_Integer]:= UpdateBackgroung @ Range[from, to];
 
 (*automatic background updater*)
-UpdateBackgroung[] := UpdateBackgroung[1, NumberOfFrames[]];
+UpdateBackgroung[] := UpdateBackgroung[1, VideoLength[]];
 
-MeanBackground[range_] := Image @ Mean[ ImageData /@ (GetFrame /@ range) ]
+MeanBackground[range_] := Image @ Mean[ ImageData /@ (VideoGet @ range) ]
 
-MedianBackground[range_] := Image @ Median[ ImageData /@ (GetFrame /@ range) ]
+MedianBackground[range_] := Image @ Median[ ImageData /@ (VideoGet @ range) ]
 
 (*  Algorithm averages not moving parts of the image over many frames
     Not buffered to allow mean image for large video files that are sparsly sampled
@@ -101,7 +98,7 @@ MedianBackground[range_] := Image @ Median[ ImageData /@ (GetFrame /@ range) ]
 SmartMeanBackground[range_] := Module[{RunBGAnalysis},
     RunBGAnalysis[sum0_, n0_, attemptsLeft_] := Module[
         {frames, sum, n, ComputeN, ns},
-        frames = RandomSample[ GetFrame /@ RandomSample[range, Min[200, Length@range]] ];
+        frames = RandomSample[ VideoGet @ RandomSample[range, Min[200, Length@range]] ];
         FindStationaryPoints[i_] := Module[{d1,d2, filterAt},
             filterAt = 0.025; (* set where to binirize imges *)
             d1 = ImageDifference[frames[[i-1]],frames[[i]]]// Binarize[#,filterAt]&// ColorNegate;
@@ -131,7 +128,7 @@ FrameBinarize[img_Image] := If[ OptionValue[VideoTracking,Threshold] === Automat
     Binarize[ img , OptionValue[VideoTracking,Threshold] ]
 ]
 
-RunAnalysis[from_:1, to_: NumberOfFrames[]] := Module[
+RunAnalysis[from_:1, to_: VideoLength[]] := Module[
     {reults, blockSize, Unzipper, AnalyseBlock},
 
     Unzipper[el_] := If[ Length @ el[[2]] > 0,
@@ -150,12 +147,13 @@ RunAnalysis[from_:1, to_: NumberOfFrames[]] := Module[
     blockSize = OptionValue[VideoTracking, AnalysisBlockSize];
 
     results = Table[ 
-        AnalyseBlock @ Range[from + (i-1)*blockSize, Min[(from + i*blockSize-1), NumberOfFrames[] ] ] ,  
+        AnalyseBlock @ Range[from + (i-1)*blockSize, Min[(from + i*blockSize-1), VideoLength[] ] ] ,  
         {i, 1, Ceiling[(to-from+1)/blockSize]}
     ];
     Flatten[ results, 1 ]
 ]
 
+(*todo: faze out - very slow algorithm*)
 GetPositions[img_] := SelectParticles[img] /. ComponentMeasurements[img, "Centroid"]
 
 (*slow! todo: collect measurements *)
@@ -167,10 +165,10 @@ SelectParticles[img_] := Intersection[
 
 AnalyseFrame[frame_Integer] := Module[
     {img, imgWBG, takePartilces},
-    img = SubstractBG @ GetFrame[ frame ];
+    img = SubstractBG @ VideoGet[ frame ];
     imgWBG = FrameBinarize @ img;
     takePartilces = SelectParticles @ imgWBG;
-    ForFitSubPixel[ img, imgWBG , takePartilces]
+    ForallFitSubPixel[ img, imgWBG , takePartilces]
 ]
 
 (* ::Section:: *)

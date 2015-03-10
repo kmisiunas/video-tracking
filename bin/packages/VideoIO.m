@@ -60,9 +60,6 @@ VideoBufferAll::usgae =
 VideoClearBuffer::usage =
   "VideoClearBuffer[] clears entire buffered data"
 
-VideoDimmensionsRaw::usage = 
-  "VideoDimmensionsRaw[] returns size of input video before it was cut"
-
 VideoLength::usage =
   "VideoLength[] returns number of frames in buffered video"
 
@@ -91,14 +88,13 @@ Begin["`Private`"]
 
 (*initial values*)
 videoFile = ""; numberOfFrames = 0; framesIds = {};
-{widthRaw, heightRaw} = {0,0};
 preprocessRawFrames = {}; (*types of functions to apply for pre processing raw frames*)
 
 
 (*private: process RAW frame - including pre-processing state*)
 VideoProcessRawFrame[no_Integer, img_Image] := (
   #[no, img] &/@ preprocessRawFrames;
-  ColorConvert[ ImageTake[img, ROICurrent[]], "Grayscale"]
+  ColorConvert[ ImageTrim[img, ROICurrent[] + {{0.5, 0.5}, {-0.5, -0.5}}], "Grayscale"]
 )
 
 
@@ -115,23 +111,22 @@ VideoSelect[file_String] :=
 VideoSelect[] := VideoSelect[ SystemDialogInput["FileOpen", Directory[]] ]
 
 PrepareVideoInput[file_String] := Module[ {img, modifyFrameID},
-  numberOfFrames = FFImport[file,{"FrameCount"}]; 
+  numberOfFrames = FFImport[file, {"FrameCount"}];
+  dimensions = FFImport[file, {"ImageSize"}]; 
   videoFile = file;
-  img = VideoGetRaw[1];
-  {widthRaw, heightRaw} = ImageDimensions[img];
   framesIds = Range@numberOfFrames;
+  ROISelect[{{0,0}, dimensions } ];
   If[ OptionValue[VideoIO, "FrameIdFromFrame"], (*try reading frame ids along the way?*)
     modifyFrameID[no_Integer, img_Image] := (framesIds[[no]] = VideoReadFrameID[img]);
     VideoAddProcessRawFrame @ modifyFrameID
   ]
   VideoClearBuffer[];
   FileNameTake[file] <> " has "<>ToString@numberOfFrames <> 
-    " frames and is "<> ToString@widthRaw <>"x"<>ToString@heightRaw
+    " frames and is "<> ToString@dimensions[[1]] <>"x"<>ToString@dimensions[[2]]
 ]
 
 VideoLength[] := numberOfFrames
 
-VideoDimmensionsRaw[] := {widthRaw, heightRaw}
 
 (* Descrption:
     The buffer loads cropped images into the memory - it does that in a separate processor 
@@ -142,10 +137,11 @@ VideoGet[frame_Integer] := (
 )
 
 VideoGet[range_?VectorQ] := VideoGet/@range
-VideoGet[frame_Integer, "NoBuffer"] := CutFrame@VideoGetRaw@frame
+VideoGet[frame_Integer, "NoBuffer"] := VideoProcessRawFrame@VideoGetRaw@frame
+VideoGet[range_?VectorQ, "NoBuffer"] := VideoProcessRawFrame/@VideoGetRaw/@range
 
-VideoGetRaw[frame_Integer] := FFImport[ VideoFile[], {"Frames",frames} ]
-VideoGetRaw[range_?VectorQ] := FFImport[ VideoFile[], {"Frames",range} ]
+VideoGetRaw[frame_Integer] := FFImport[ VideoFile[], {"Frames", frame} ]
+VideoGetRaw[range_?VectorQ] := FFImport[ VideoFile[], {"Frames", range} ]
 
 VideoFrameID[] := framesIds
 VideoFrameID[no_Integer] := framesIds[[no]]
@@ -159,12 +155,12 @@ WhichBlock[frame_] := Ceiling[ (frame - 0.5)/blockSize ]
 VideoClearBuffer[] := Module[ {} ,
   Clear[bufferVideo];
   (*prepare for new*)
-  blockSize = OptionValue[VideoIO, BufferBlockSize];
-  singleFrameSize = ByteCount @ GetFrames[1];
+  blockSize = OptionValue[VideoIO, "BufferBlockSize"];
+  singleFrameSize = ByteCount @ VideoGet[1, "NoBuffer"];
   bufferVideo = Array[{} &, 1000];
   bufferVideoTimeStamp = Array[0 &, 1000];
   (*other stuff*)
-  If[singleFrameSize*blockSize /10^6 > OptionValue[VideoIO, BufferBlockSize],
+  If[singleFrameSize*blockSize /10^6 > OptionValue[VideoIO, "BufferBlockSize"],
     Print@"Warrning: buffer too small for current ROI."  ]
 ]
 
@@ -176,7 +172,7 @@ LoadBufferBlock[frame_] := Module[{from, to},
   from = Floor[frame - 0.5, blockSize] + 1 ;
   to = Min[ Ceiling[frame - 0.5, blockSize] , VideoLength[] ] ;
   PrintTemporary @ ("Buffer: loading frame block: ["<>ToString@from<>", "<> ToString@to<>"]");
-  bufferVideo[[ WhichBlock @ frame ]] = GetFrames @ Range[from, to] ;
+  bufferVideo[[ WhichBlock @ frame ]] = VideoGet[ Range[from, to] , "NoBuffer"] ;
   bufferVideoTimeStamp[[ WhichBlock @ frame ]] = AbsoluteTime[];
 ]
 
@@ -195,7 +191,7 @@ BufferContainsQ[frame_] := bufferVideoTimeStamp[[ WhichBlock @ frame ]] > 0
 
 (*loads all frames using ffmpeg!*)
 VideoBufferAll[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfFrames, images},
-  size = OptionValue[VideoIO, BufferBlockSize];
+  size = OptionValue[VideoIO, "BufferBlockSize"];
   expectedNoOfFrames = FFImport[ VideoFile[], "FrameCount"];
   {stream, dim} = FFInputStreamAt[ VideoFile[], 1, All]; (*might cause error because of order!*)
 

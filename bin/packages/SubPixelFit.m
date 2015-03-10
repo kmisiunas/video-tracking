@@ -54,10 +54,11 @@ ImageToList[img_Image] :=
 
 
 FitSubPixel[img_Image, box_] := 
-  GetPosition[ SPFGaussianOptimised@ImageTrim[ img, # ], # ] &@ box
+  GetPosition[ SPFGaussianOptimised@ImageTrim[ img, # + {{0.5, 0.5}, {-0.5, -0.5}}], # ] &@ box
 
 (*private: absolute position of particles in the frames*)
-GetPosition[res_, box_] := N@Round[  (res[[{1,2}]] + box[[1]]) ~ Join ~ res[[3;;]] , 0.01]
+GetPosition[res_, box_] := 
+  N@Round[  (res[[{1,2}]] + box[[1]]) ~ Join ~ res[[3;;]] , 0.01]
 
 (*todo: add judgement on box size!*)
 ForallFitSubPixel[img_Image, binImg_Image, ids_] := 

@@ -41,7 +41,7 @@ Begin["`Private`"]
 
 VideoFindThreshold[range_] := Module[ {binList,MeanBinPlace,hist,peaks, thePeak},
   (*estimate the bin list*)
-  binList = FindThreshold[#, Method -> "Cluster"] &/@ SubstractBG /@ GetFrame /@ range;
+  binList = FindThreshold[#, Method -> "Cluster"] &/@ SubstractBG /@ VideoGet /@ range;
   (*centers HistogramList output *)
   MeanBinPlace[data_] := { (data[[1, 2 ;;]] + data[[1, ;; -2]])/2 , data[[2]] };
   hist = N@Transpose@MeanBinPlace@HistogramList@binList;
@@ -66,21 +66,21 @@ VideoFindThreshold[range_] := Module[ {binList,MeanBinPlace,hist,peaks, thePeak}
 ]
 
 VideoFindThreshold[] :=
-    VideoFindThreshold[ RandomSample[ Range @ NumberOfFrames[], Min[1000, NumberOfFrames[]] ] ]
+    VideoFindThreshold[ RandomSample[ Range @ VideoLength[], Min[1000, VideoLength[]] ] ]
 
 (*============ VideoFindActiveFrames =============*)
 
 VideoFindActiveFrames[scanDensity_Integer] := Module[
   {data},
   data =
-    {#, ImageMeasurements[ SubstractBG@GetFrame[#], "MeanIntensity"] } &/@ Range[1, NumberOfFrames[], scanDensity];
+    {#, ImageMeasurements[ SubstractBG@VideoGet[#], "MeanIntensity"] } &/@ Range[1, VideoLength[], scanDensity];
   ListPlot[data,
     Frame -> True,
     FrameLabel -> {"Frame number", "Foreground intensity"}
   ]
 ]
 
-VideoFindActiveFrames[] := VideoFindActiveFrames[ Round[ NumberOfFrames[]/1000 ]]
+VideoFindActiveFrames[] := VideoFindActiveFrames[ Round[ VideoLength[]/1000 ]]
 
 (*============ VideoReadFrameID =============*)
 
