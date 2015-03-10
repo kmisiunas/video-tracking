@@ -10,44 +10,34 @@
 
 (* ::Text:: *)
 (*Version 1 (2014-02-19) - initial release. *)
+(*Version 2 (2015-03-10) - Background estimate functions exported to BackgroundEstimate.m *)
 
 
 (* ::Section:: *)
 (* Package Declarations*)
 
 
-BeginPackage["VideoTracking`", {"VideoIO`", "SubPixelFit`", "VideoSupportUI`", "FFmpeg`", "VideoAnalysis`"}]
+BeginPackage["VideoTracking`", 
+  {"VideoIO`", "SubPixelFit`", "VideoSupportUI`", "VideoAnalysis`", "BackgroundEstimate`"} ]
 
 
 SubstractBG::usage = 
-    "substracts background image"
-
-UpdateBackgroung::usage = 
-    "updates background image based on specified frames"
+  "substracts background image"
 
 FrameBinarize::usage = 
-    "binirizes the image, with settings"
-
-CurrentBackground::usage = 
-    "return current global background image"
-
-SmartMeanBackground::usage = 
-    "SmartMeanBackground[range_] estimates mean background image using smart algorithm"
-
-MeanBackground::usage = 
-    "MeanBackground[range_] estimates mean background image using"
+  "binirizes the image, with settings"
 
 SelectParticles::usage = 
-    "SelectParticles[img_] selects the particle that fit search parameters"
+  "SelectParticles[img_] selects the particle that fit search parameters"
 
 AnalyseFrame::usage = 
-    "AnalyseFrame[frame_] returns positions at the given frame"
+  "AnalyseFrame[frame_] returns positions at the given frame"
 
 RunAnalysis::usage = 
-    "RunAnalysis[from_ , to_] does video traking analysis in parallel"
+  "RunAnalysis[from_ , to_] does video traking analysis in parallel"
 
 PrepareAnalysis::usage = 
-    "PrepareAnalysis[] does the nessesary background for the fast analysis"
+  "PrepareAnalysis[] does the nessesary background for the fast analysis"
 
 
 (* options associated with analysis *)
@@ -57,7 +47,6 @@ Options[VideoTracking] = {
     "FilterCircularity" -> {0.9, 1.5} (*the circularity requrement for the shape*),
     "AnalysisBlockSize" -> 4000 (* do analysis in lumps, update BG in between *),
     "UpdateBackgroung" -> False (*to update BG automatically or not*) ,
-    "BackgroundAlgorithm" -> SmartMeanBackground (*determine which background computation algorithm to use*),
     "MinThreshold" -> 0.05 (*minimum threshold for binirizing the image under automatic mode*)
 }
 
@@ -67,56 +56,9 @@ Options[VideoTracking] = {
 
 Begin["`Private`"]
 
-background = {};
 
-CurrentBackground[] := background
 
 SubstractBG[img_Image]:= ImageSubtract[ img, background]
-
-UpdateBackgroung[img_Image]:= ( background = img )
-
-(*updates bg with safety fall back to mean bg algorithm*)
-UpdateBackgroung[ids_]:= 
-  UpdateBackgroung @ Quiet @ Check[ 
-    OptionValue[VideoTracking,BackgroundAlgorithm] @ ids , 
-        Print@"Algorithm Failed: falling back to mean background algorithm.";
-        MedianBackground @ ids
-    ];
-
-UpdateBackgroung[from_Integer,to_Integer]:= UpdateBackgroung @ Range[from, to];
-
-(*automatic background updater*)
-UpdateBackgroung[] := UpdateBackgroung[1, VideoLength[]];
-
-MeanBackground[range_] := Image @ Mean[ ImageData /@ (VideoGet @ range) ]
-
-MedianBackground[range_] := Image @ Median[ ImageData /@ (VideoGet @ range) ]
-
-(*  Algorithm averages not moving parts of the image over many frames
-    Not buffered to allow mean image for large video files that are sparsly sampled
-    *)
-SmartMeanBackground[range_] := Module[{RunBGAnalysis},
-    RunBGAnalysis[sum0_, n0_, attemptsLeft_] := Module[
-        {frames, sum, n, ComputeN, ns},
-        frames = RandomSample[ VideoGet @ RandomSample[range, Min[200, Length@range]] ];
-        FindStationaryPoints[i_] := Module[{d1,d2, filterAt},
-            filterAt = 0.025; (* set where to binirize imges *)
-            d1 = ImageDifference[frames[[i-1]],frames[[i]]]// Binarize[#,filterAt]&// ColorNegate;
-            d2 = ImageDifference[frames[[i]],frames[[i+1]]]// Binarize[#,filterAt]&// ColorNegate;
-            ImageMultiply[d1,d2]
-        ];
-        ns = FindStationaryPoints /@ Range[2,Length@frames-1];
-        n = n0 + Total[ ImageData /@ ns ];
-        sum = sum0 + Total[ ImageData /@ Thread[ImageMultiply[frames[[#]],ns[[#-1]]]&/@ Range[2,Length@frames-1]]];
-        (*return result*)
-        If[ (MemberQ[n, 0.0, 2] || MemberQ[n, 1.0, 2]) && attemptsLeft > 0, 
-            RunBGAnalysis[ sum, n, attemptsLeft-1 ],
-            Image @ (sum/n)
-        ]
-    ];
-    RunBGAnalysis[0, 0, 4]
-]
-
 
 
 (* ::Section:: *)
@@ -150,9 +92,6 @@ RunAnalysis[from_:1, to_: VideoLength[]] := Module[
     ];
     Flatten[ results, 1 ]
 ]
-
-(*todo: faze out - very slow algorithm*)
-GetPositions[img_] := SelectParticles[img] /. ComponentMeasurements[img, "Centroid"]
 
 (*slow! todo: collect measurements *)
 SelectParticles[img_] := Intersection[ 
