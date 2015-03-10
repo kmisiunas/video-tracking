@@ -128,13 +128,11 @@ FrameBinarize[img_Image] := If[ OptionValue[VideoTracking,Threshold] === Automat
     Binarize[ img , OptionValue[VideoTracking,Threshold] ]
 ]
 
+(*todo: tolerate new output*)
 RunAnalysis[from_:1, to_: VideoLength[]] := Module[
     {reults, blockSize, Unzipper, AnalyseBlock},
 
-    Unzipper[el_] := If[ Length @ el[[2]] > 0,
-        Map[ {el[[1]] , #[[1]], #[[2]]} &, el[[2]] ],
-        {}
-    ];
+    Unzipper[{id_, res_}] := {id} ~ Join ~ # &/@ res;
 
     AnalyseBlock[ids_] := Module[{positions, zipped},
         PrintTemporary @ ( "Analysis: of frames ["<>ToString@Min@ids<>", "<>ToString@Max@ids<>"]" );

@@ -14,13 +14,13 @@
 (*Version 2 (2014-04-29) - introduced "quality" parameter that gives 
   the probability of the fit being correct.*)
 (*Version 2.1 (2015-03-01) - trim output precision to reflect limited accuracy of sub pixel fit*)
-(*Version 3 (2015-03-06) - Output restructured: {x,y, correctness, size, angle, flattening}
+(*Version 3 (2015-03-06) - Output restructured: {x,y,z, correctness, size, angle, flattening}
                            Changed ImageToList to have index from 1
                            Updated the sub pixel fitting routines 
                            Added ExpandBox[] method because Gaussian fitting prefers larger areas *)
 
 (*== Specs ==*)
-(* Output: List of {x,y, correctness, size*, angle*, flattening*} *)
+(* Output: List of {x,y,z, correctness, size*, angle*, flattening*} *)
 
 (* ::Section:: *)
 (* Package Declarations*)
@@ -39,6 +39,7 @@ ForallFitSubPixel::usage =
   (Automatic box selection - optimised for multiple particles)"
 
 
+
 (* ::Section:: *)
 (*Package Implementations - Public*)
 
@@ -47,6 +48,7 @@ Begin["`Private`"]
 
 (* ::Section:: *)
 (*Implementation*)
+
 
 ImageToList[img_Image] := 
  Flatten[MapIndexed[{#2[[2]], #2[[1]], #1} &, 
@@ -94,7 +96,7 @@ SPFGaussianFixed[img_Image] := Block[
     my >= dimensions[[2]] || s > 0.66*Mean@dimensions, 
    Return@failedResults];
   (*format the reply*)
-  {mx - 0.5, my - 0.5,
+  {mx - 0.5, my - 0.5, 0,
    (*fit quality*)
    1,
    (*size*)
@@ -139,7 +141,7 @@ SPFGaussianOptimised[img_Image] := Block[
   (*format the otput*)
   {
    (*position*)
-   mx - 0.5, my - 0.5,
+   mx - 0.5, my - 0.5, 0,
    (*fit quality*)
    1 (*bad one elliminated for tother routines*),
    (*size*)
