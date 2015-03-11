@@ -58,7 +58,7 @@ BackgroungUpdate[range_?VectorQ] :=
     ];
 
 (*automatic background updater*)
-BackgroungUpdate[] := UpdateBackgroung @ Range @ VideoLength[];
+BackgroungUpdate[] := BackgroungUpdate @ Range @ VideoLength[];
 
 
 (*=========  Algorithms  ========*)

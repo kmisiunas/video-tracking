@@ -29,7 +29,7 @@
 (* Package Declarations*)
 
 
-BeginPackage["VideoIO`", {"FFmpeg`", "VideoAnalysis`", "ROI`"}]
+BeginPackage["VideoIO`", {"FFmpeg`", "VideoAnalysisHelpers`", "ROI`"}]
 
 
 (* ---  Get Frame functions  --- *)
@@ -201,9 +201,9 @@ VideoBufferAll[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfF
         If[ Divisible[i,500], PrintTemporary["Buffer: loaded "~~ToString@i~~" frames"] ];
         Sow @ VideoProcessRawFrame[ i, FFGetNextFrame[stream, dim] ]
         , Throw[i-1] ],
-      {i, VideoLength[]}
+      {i, expectedNoOfFrames}
     ];
-  images = res[[2,1]];
+  images = If[ res[[1]] == Null, res[[2,1]], res[[2,1, ;;res[[1]] ]] ];
   newFrameCount = Length@images;
   Print["Buffer: expected " ~~ ToString@expectedNoOfFrames ~~ 
         " frames. ffmpeg found " ~~ ToString@newFrameCount ];
