@@ -30,14 +30,14 @@ Begin["`Private`"]
 (* ::Section:: *)
 (*Package Implementations*)
 
-
+(*todo: update*)
 UIAnalyseFrame[i_Integer] := Module[{img, imgBin,imgSubBG, posT,pImg, listProp},
-  img = GetFrame[ Min[i, NumberOfFrames[] ] ];
+  img = VideoGet[ Min[i, VideoLength[] ] ];
   imgBin=FrameBinarize[img];
   posT = GetPositions @ imgBin;
-  imgSubBG= ShowTrackOverlayed[SubstractBG@img//ImageAdjust[#,{0,10}]&, posT];
+  imgSubBG= ShowTrackOverlayed[VideoGetForeground@img//ImageAdjust[#,{0,10}]&, posT];
   listProp = {{
-  "frame"-> Min@{i, NumberOfFrames[]},
+  "frame"-> Min@{i, VideoLength[]},
   "centroid"->ComponentMeasurements[imgBin, "Centroid"],
   "circularity"-> ComponentMeasurements[imgBin, "Circularity"],
   "area"->ComponentMeasurements[imgBin, "Area"],
