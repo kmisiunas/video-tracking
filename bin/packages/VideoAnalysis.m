@@ -49,6 +49,11 @@ VideoAnalyseFrame::usage =
 VideoAnalyse::usage = 
   "VideoAnalyse[range_] performs video analysis on specified range or on all if not specified"
 
+VideoProblemInFrames::usage =
+  "VideoProblemsInFrames[] returns a list of frames that had some problem detected in it.
+   VideoProblemsInFrames[frame_, description_] adds a problem to the list.
+   VideoProblemsInFrames[Clear] removes all old data."
+
 (*messages for user*)
 
 VideoGetForeground::notMethod = 
@@ -95,7 +100,7 @@ VideoFrameBinarize[img_Image] := Switch[ OptionValue[VideoTracking,"Threshold"],
 
 FindParticles[img_Image] := ComponentMeasurements[ img,
   (*properties to read*)
-  {"Area", "Elongation", "AdjacentBorderCount"},
+  {"Area", "Elongation", "AdjacentBorderCount"}, (*"todo: perimeter for checking of shape is convex"*)
   (*filter out too small particles*)
   #1 >= OptionValue[VideoTracking, "FilterArea"][[1]] &
 ]
@@ -125,7 +130,8 @@ SelectOverlappingParticles[list_, excludeIds_?VectorQ] := Select[ list,
 ][[;;,1]]
 
 ReportOverlapOccurances[list_?VectorQ, frame_Integer] := 
-  If[Length@list > 0, Print["Overlapping particles at frame "<>ToString@frame] ];
+  If[Length@list > 0, 
+    VideoProblemInFrames[frame, "overlapping: "<>ToString@Length@list<>" possible overlaps"] ];
 
 
 
@@ -146,10 +152,11 @@ VideoAnalyseFrame[frame_Integer] := Block[
 (*fancy but does not run in parallel because of other methods are not able to be invoked on multiple cores?*)
 VideoAnalyse[range_?VectorQ] := Module[
     {blockSize, blockUpdate},
+    VideoProblemInFrames[Clear];
     blockSize = OptionValue[VideoTracking, AnalysisBlockSize];
     blockUpdate[i_Integer] := (
       If[ OptionValue[VideoTracking, UpdateBackgroung],  BackgroungUpdate@Range[i+1, i+blockSize] ];
-      Print["Analysing: frames [["<> ToString[i+1] <> " ;; "<> ToString[Min[VideoLength[], i + blockSize]]<>"]"];
+      Print["Analysing: frames [["<> ToString[i+1] <> " ;; "<> ToString[Min[VideoLength[], i + blockSize]]<>"]]"];
     );
     blockUpdate[0];
     Part[ Reap @ Do[  If[Divisible[i, blockSize], blockUpdate[i] ];
@@ -158,6 +165,18 @@ VideoAnalyse[range_?VectorQ] := Module[
 ]
 
 VideoAnalyse[] := VideoAnalyse @ Range @ VideoLength[]
+
+
+(* ::Section:: *)
+(*Implementations - Keep record of problems (aka overlapping particles) *)
+
+problems = {};
+
+VideoProblemInFrames[] := DeleteDuplicates@problems
+
+VideoProblemInFrames[frame_Integer, desc_String] := problems ~ AppendTo ~ {frame, desc}
+
+VideoProblemInFrames[Clear] := (problems = {});
 
 
 (* ::Section:: *)

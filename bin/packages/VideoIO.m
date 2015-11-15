@@ -15,6 +15,7 @@
 (*Version 2.0 (2015-03-09) - Renamed functions sot he first name indicates idea space: ROI..., Video...
                              Produces Frame id counter - and scans for id where possible 
                              ROI.m exported as separate package *)
+(*Version 3.0 (2015-11-14) - Allow to specify Import library (eg. Import or FFImport) *)
 
 (* ::Plan for future::*)
 (*
@@ -73,7 +74,8 @@ VideoAddProcessRawFrame::usage =
 Options[VideoIO] = { 
   "BufferSizeMB" -> 1000 (*number of frames to store in the buffer*),
   "BufferBlockSize" -> 400 (*number of frames to load into memory at one time *),
-  "FrameIdFromFrame" -> False (*frame top left corner has frame id *)
+  "FrameIdFromFrame" -> False (*frame top left corner has frame id *),
+  "Import" -> FFImport (*function to use for importing images*)
 }
 
 (* ::Section:: *)
@@ -90,6 +92,7 @@ Begin["`Private`"]
 videoFile = ""; numberOfFrames = 0; framesIds = {};
 preprocessRawFrames = {}; (*types of functions to apply for pre processing raw frames*)
 
+import := OptionValue[VideoIO, "Import"]
 
 (*private: process RAW frame - including pre-processing state*)
 VideoProcessRawFrame[no_Integer, img_Image] := (
@@ -111,11 +114,12 @@ VideoSelect[file_String] :=
 VideoSelect[] := VideoSelect[ SystemDialogInput["FileOpen", Directory[]] ]
 
 PrepareVideoInput[file_String] := Module[ {img, modifyFrameID},
-  numberOfFrames = FFImport[file, {"FrameCount"}];
-  dimensions = FFImport[file, {"ImageSize"}]; 
+  numberOfFrames = import[file, {"FrameCount"}];
+  dimensions = import[file, {"ImageSize"}]; 
   videoFile = file;
   framesIds = Range@numberOfFrames;
   ROISelect[{{0,0}, dimensions } ];
+  preprocessRawFrames = {};
   If[ OptionValue[VideoIO, "FrameIdFromFrame"], (*try reading frame ids along the way?*)
     modifyFrameID[no_Integer, img_Image] := (framesIds[[no]] = VideoReadFrameID[img]);
     VideoAddProcessRawFrame @ modifyFrameID
@@ -137,11 +141,11 @@ VideoGet[frame_Integer] := (
 )
 
 VideoGet[range_?VectorQ] := VideoGet/@range
-VideoGet[frame_Integer, "NoBuffer"] := VideoProcessRawFrame@VideoGetRaw@frame
-VideoGet[range_?VectorQ, "NoBuffer"] := VideoProcessRawFrame/@VideoGetRaw/@range
+VideoGet[frame_Integer, "NoBuffer"] := VideoProcessRawFrame[frame, #] &@ VideoGetRaw@frame
+VideoGet[range_?VectorQ, "NoBuffer"] := VideoProcessRawFrame @@ # &/@ ({#, VideoGetRaw[#]} &/@ range)
 
-VideoGetRaw[frame_Integer] := FFImport[ VideoFile[], {"Frames", frame} ]
-VideoGetRaw[range_?VectorQ] := FFImport[ VideoFile[], {"Frames", range} ]
+VideoGetRaw[frame_Integer] := import[ VideoFile[], {"Frames", frame} ]
+VideoGetRaw[range_?VectorQ] := import[ VideoFile[], {"Frames", range} ]
 
 VideoFrameID[] := framesIds
 VideoFrameID[no_Integer] := framesIds[[no]]
@@ -192,12 +196,12 @@ BufferContainsQ[frame_] := bufferVideoTimeStamp[[ WhichBlock @ frame ]] > 0
 (*loads all frames using ffmpeg!*)
 VideoBufferAll[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfFrames, images},
   size = OptionValue[VideoIO, "BufferBlockSize"];
-  expectedNoOfFrames = FFImport[ VideoFile[], "FrameCount"];
-  {stream, dim} = FFInputStreamAt[ VideoFile[], 1, All]; (*might cause error because of order!*)
+  expectedNoOfFrames = import[ VideoFile[], "FrameCount"];
+  {stream, dim} = FFInputStreamAt[ VideoFile[], 1, expectedNoOfFrames]; (*might cause error because of order!*)
 
   res = 
     Reap @ Catch @ Do[ (*run though entire file till there is no frames*)
-      Quiet @ Check[ 
+       Quiet @ Check[ 
         If[ Divisible[i,500], PrintTemporary["Buffer: loaded "~~ToString@i~~" frames"] ];
         Sow @ VideoProcessRawFrame[ i, FFGetNextFrame[stream, dim] ]
         , Throw[i-1] ],
@@ -205,19 +209,18 @@ VideoBufferAll[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfF
     ];
   images = If[ res[[1]] == Null, res[[2,1]], res[[2,1, ;;res[[1]] ]] ];
   newFrameCount = Length@images;
-  Print["Buffer: expected " ~~ ToString@expectedNoOfFrames ~~ 
-        " frames. ffmpeg found " ~~ ToString@newFrameCount ];
-  (*warn if the difference is very large*)
-  If[ Abs[newFrameCount/expectedNoOfFrames -1] > 0.05, 
-      Print@Style["Warring: Loaded less than 95% of expected frames. FFMPEG might have failed.", Red]
-  ];
   numberOfFrames = newFrameCount; (*update number of frames*)
   framesIds = framesIds[[ ;;VideoLength[] ]]; (*shorten the list to correspond to the new buffer*)
   (*update buffer*)
-  bufferVideo = Partition[ images , size, size, 1, {}];
+  bufferVideo = Partition[ images , size, size, 1, {} ];
   bufferVideoTimeStamp[[ ;; Length@bufferVideo ]] = AbsoluteTime[];
   Close[stream];
-  Print @ "Buffer: loaded entire video";
+  (*warn if the difference is very large*)
+  If[ newFrameCount == expectedNoOfFrames , 
+      Print @ "Buffer: loaded entire video" , 
+      Print @ Style["Buffer: [Warning] expected " <> ToString@expectedNoOfFrames <> 
+        " frames, but FFmpeg found " <> ToString@newFrameCount , Red]
+  ];
 ]
 
 (* ::Section:: *)
