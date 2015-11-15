@@ -193,20 +193,49 @@ MakeSpaceInBuffer[] := Module[ {oldestBlockId, creationDates},
 
 BufferContainsQ[frame_] := bufferVideoTimeStamp[[ WhichBlock @ frame ]] > 0 
 
-(*loads all frames using ffmpeg!*)
-VideoBufferAll[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfFrames, images},
-  size = OptionValue[VideoIO, "BufferBlockSize"];
-  expectedNoOfFrames = import[ VideoFile[], "FrameCount"];
-  {stream, dim} = FFInputStreamAt[ VideoFile[], 1, expectedNoOfFrames]; (*might cause error because of order!*)
+VideoBufferAll[] := Switch[ OptionValue[VideoIO, "Import"],
+  FFImport, VideoBufferAllUsingFFImport[],
+  Import  , VideoBufferAllUsingImport[],
+  _       , Print["Unknown import function, using Import[] "]; VideoBufferAllUsingImport[]
+];
 
-  res = 
+(*load all videos to memory by analysing them in large chunks *)
+VideoBufferAllUsingImport[] := Module[ {size,expectedNoOfFrames, chuncks, imageBuffer},
+  size = OptionValue[VideoIO, "BufferBlockSize"];
+  chuncks = Partition[ Range[VideoLength[]],  size, size, 1, {}];
+  Monitor[
+    bufferVideo = Table[ (*parallel?*)
+      (*compute on chunks of frames here*)
+      VideoProcessRawFrame @@ #  &/@ Transpose[ {chuncks[[i]]  , Import[ VideoFile[] , {"Frames", chuncks[[i]]} ]} ]
+      ,
+      {i, Length[chuncks]}
+    ],
+    (*monitor*)
+    Row[{"Buffering frames ", ProgressIndicator[i, {1, Length[chuncks]}]}]
+  ];
+  (* annoying book keeping here*)
+  numberOfFrames = Total[Length /@ bufferVideo];
+  framesIds = framesIds[[ ;;VideoLength[] ]]; (*shorten the list to correspond to the new buffer*)
+  bufferVideoTimeStamp[[ ;; Length@bufferVideo ]] = AbsoluteTime[];
+]
+
+(*loads all frames using ffmpeg!*)
+VideoBufferAllUsingFFImport[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfFrames, images},
+  size = OptionValue[VideoIO, "BufferBlockSize"];
+  expectedNoOfFrames = FFImport[ VideoFile[], "FrameCount"];
+  {stream, dim} = FFInputStreamAt[ VideoFile[], 1, expectedNoOfFrames]; (*might cause error because of order!*)
+  Monitor[
+    res = 
     Reap @ Catch @ Do[ (*run though entire file till there is no frames*)
        Quiet @ Check[ 
-        If[ Divisible[i,500], PrintTemporary["Buffer: loaded "~~ToString@i~~" frames"] ];
+        (* If[ Divisible[i,500], PrintTemporary["Buffer: loaded "~~ToString@i~~" frames"] ]; *)
         Sow @ VideoProcessRawFrame[ i, FFGetNextFrame[stream, dim] ]
         , Throw[i-1] ],
       {i, expectedNoOfFrames}
-    ];
+    ],
+    Row[{"Buffering frames ", ProgressIndicator[i, {1, expectedNoOfFrames}]}] (* slow? *)
+  ];
+
   images = If[ res[[1]] == Null, res[[2,1]], res[[2,1, ;;res[[1]] ]] ];
   newFrameCount = Length@images;
   numberOfFrames = newFrameCount; (*update number of frames*)
