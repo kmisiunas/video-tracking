@@ -16,6 +16,7 @@
                              Produces Frame id counter - and scans for id where possible 
                              ROI.m exported as separate package *)
 (*Version 3.0 (2015-11-14) - Allow to specify Import library (eg. Import or FFImport) *)
+(*Version 3.1 (2015-12-04) - Stable under unexpected FF stream closure  *)
 
 (* ::Plan for future::*)
 (*
@@ -186,7 +187,8 @@ BufferMemorySize[] := singleFrameSize * Total[ Length /@ bufferVideo ] / 10^6 //
 MakeSpaceInBuffer[] := Module[ {oldestBlockId, creationDates},
   creationDates = MapIndexed[{#2[[1]], #1} &, bufferVideoTimeStamp ] ;
   oldestBlockId = SortBy[ Select[creationDates, #[[2]]>0 &], Last][[1,1]] ;
-  PrintTemporary @ ("Buffer: deleting frame block: ["<>ToString@(oldestBlockId*blockSize+1)<>", "<> ToString@((oldestBlockId+1)*blockSize)<>"]");
+  PrintTemporary @ ("Buffer: deleting frame block: ["<>ToString@(oldestBlockId*blockSize+1)<>", "<> 
+      ToString@((oldestBlockId+1)*blockSize)<>"]");
   bufferVideo[[ oldestBlockId ]] = {};
   bufferVideoTimeStamp[[ oldestBlockId ]] = 0;
 ]
@@ -206,7 +208,7 @@ VideoBufferAllUsingImport[] := Module[ {size,expectedNoOfFrames, chuncks, imageB
   Monitor[
     bufferVideo = Table[ (*parallel?*)
       (*compute on chunks of frames here*)
-      VideoProcessRawFrame @@ #  &/@ Transpose[ {chuncks[[i]]  , Import[ VideoFile[] , {"Frames", chuncks[[i]]} ]} ]
+      VideoProcessRawFrame @@ # &/@ Transpose[ {chuncks[[i]]  , Import[ VideoFile[] , {"Frames", chuncks[[i]]} ]} ]
       ,
       {i, Length[chuncks]}
     ],
@@ -219,25 +221,23 @@ VideoBufferAllUsingImport[] := Module[ {size,expectedNoOfFrames, chuncks, imageB
   bufferVideoTimeStamp[[ ;; Length@bufferVideo ]] = AbsoluteTime[];
 ]
 
-(*loads all frames using ffmpeg!*)
-VideoBufferAllUsingFFImport[] := Module[{dim, stream, res, size, newFrameCount, expectedNoOfFrames, images},
+(*loads all frames using ffmpeg! - focus on speed and stability*)
+VideoBufferAllUsingFFImport[] := Module[
+  {dim, stream, res, size, newFrameCount, expectedNoOfFrames, images},
   size = OptionValue[VideoIO, "BufferBlockSize"];
   expectedNoOfFrames = FFImport[ VideoFile[], "FrameCount"];
   {stream, dim} = FFInputStreamAt[ VideoFile[], 1, expectedNoOfFrames]; (*might cause error because of order!*)
-  Monitor[
-    res = 
-    Reap @ Catch @ Do[ (*run though entire file till there is no frames*)
-       Quiet @ Check[ 
-        (* If[ Divisible[i,500], PrintTemporary["Buffer: loaded "~~ToString@i~~" frames"] ]; *)
-        Sow @ VideoProcessRawFrame[ i, FFGetNextFrame[stream, dim] ]
-        , Throw[i-1] ],
-      {i, expectedNoOfFrames}
-    ],
-    Row[{"Buffering frames ", ProgressIndicator[i, {1, expectedNoOfFrames}]}] (* slow? *)
-  ];
-
-  images = If[ res[[1]] == Null, res[[2,1]], res[[2,1, ;;res[[1]] ]] ];
-  newFrameCount = Length@images;
+  Monitor[ (* Show the progress to the user *)
+    res =
+        Quiet @ Reap @ Catch @ Do[ (*run though entire file till there is no frames*)
+          If[ImageQ[#], Sow[#], Throw[i-1]] &@ VideoProcessRawFrame[ i, FFGetNextFrame[stream, dim] ] ,
+          {i, expectedNoOfFrames}
+        ],
+    Row[{"Buffering frames ", ProgressIndicator[i, {1, expectedNoOfFrames}]}] (* animation: slow? *)
+  ]; (*end Monitor*)
+  images = If[ res[[1]] === Null, res[[2,1]], res[[ 2, 1, ;; res[[1]] ]] ];
+  (*update database about video length*)
+  newFrameCount = Length[images];
   numberOfFrames = newFrameCount; (*update number of frames*)
   framesIds = framesIds[[ ;;VideoLength[] ]]; (*shorten the list to correspond to the new buffer*)
   (*update buffer*)
@@ -245,11 +245,11 @@ VideoBufferAllUsingFFImport[] := Module[{dim, stream, res, size, newFrameCount, 
   bufferVideoTimeStamp[[ ;; Length@bufferVideo ]] = AbsoluteTime[];
   Close[stream];
   (*warn if the difference is very large*)
-  If[ newFrameCount == expectedNoOfFrames , 
-      Print @ "Buffer: loaded entire video" , 
+  If[ newFrameCount != expectedNoOfFrames ,
       Print @ Style["Buffer: [Warning] expected " <> ToString@expectedNoOfFrames <> 
-        " frames, but FFmpeg found " <> ToString@newFrameCount , Red]
+        " frames, but FFmpeg found " <> ToString@newFrameCount , Red];
   ];
+  (*do not return anything*)
 ]
 
 (* ::Section:: *)
