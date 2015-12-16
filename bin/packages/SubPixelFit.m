@@ -18,6 +18,7 @@
                            Changed ImageToList to have index from 1
                            Updated the sub pixel fitting routines 
                            Added ExpandBox[] method because Gaussian fitting prefers larger areas *)
+(*Version 3.1 (2015-12-15) - Increased rounding of output to 0.001 to better account for errors *)
 
 (*== Specs ==*)
 (* Output: List of {x,y,z, correctness, size*, angle*, flattening*} *)
@@ -60,7 +61,7 @@ FitSubPixel[img_Image, box_] :=
 
 (*private: absolute position of particles in the frames*)
 GetPosition[res_, box_] := 
-  N@Round[  (res[[{1,2}]] + box[[1]]) ~ Join ~ res[[3;;]] , 0.01]
+  N@Round[  (res[[{1,2}]] + box[[1]]) ~ Join ~ res[[3;;]] , 0.001]
 
 (*todo: add judgement on box size!*)
 ForallFitSubPixel[img_Image, binImg_Image, ids_] := 
