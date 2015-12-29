@@ -108,6 +108,7 @@ ROISelect[] := Module[
               }]
            }, " "],
 
+         Row[{
          (*image and bounds + (optional) Locator*)
          Dynamic@Show[
            ROIShow[ ROICreateRect[Round@pos, {width, height}] , img],
@@ -121,6 +122,7 @@ ROISelect[] := Module[
           ImageTrim[ img, ROICreateRect[ Round@pos, {width, height}] ],
           ImageSize -> Small
         ]
+        }]
          
       }}]
     },

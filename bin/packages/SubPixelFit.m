@@ -57,7 +57,7 @@ ImageToList[img_Image] :=
 
 
 FitSubPixel[img_Image, box_] := 
-  GetPosition[ SPFGaussianOptimised@ImageTrim[ img, # + {{0.5, 0.5}, {-0.5, -0.5}}], # ] &@ box
+  GetPosition[ SPFGaussianOptimised@ImageTrim[ img, # + {{0.5, 0.5}, {-0.5, -0.5}}], # ] &@ N[box]
 
 (*private: absolute position of particles in the frames*)
 GetPosition[res_, box_] := 
