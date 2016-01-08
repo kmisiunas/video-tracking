@@ -126,8 +126,9 @@ VideoSelect[file_String] :=
 	If[ FileExistsQ@file, PrepareVideoInput[file],	Message[VideoSelect::nofile, file] ];
 VideoSelect[] := VideoSelect[ SystemDialogInput["FileOpen", Directory[]] ];
 
-PrepareVideoInput[file_String] := Module[ {img, modifyFrameID},
-  If[FileExtension[file] == "tif" || FileExtension[file] == "tiff" ],
+PrepareVideoInput[file_String] := Module[
+  {img, modifyFrameID},
+  If[ FileExtension[file] == "tif" || FileExtension[file] == "tiff" ,
     (* TIFF support *)
     numberOfFrames = import[file, {"ImageCount"}];
     dimensions = import[file, {"ImageSize",1}] ,
