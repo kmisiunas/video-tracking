@@ -17,7 +17,8 @@
                              ROI.m exported as separate package *)
 (*Version 3.0 (2015-11-14) - Allow to specify Import library (eg. Import or FFImport) *)
 (*Version 3.1 (2015-12-04) - Stable under unexpected FF stream closure  *)
-(*Version 3.2 (2016-01-08) - Migrated from importing using "Frames" -> "ImageList" for tiff stack support*)
+(*Version 3.2 (2016-01-08) - TIF stack support:
+                             Migrated from importing using "Frames" -> "ImageList" for tiff stack support*)
 
 
 (* ::Plan for future::*)
@@ -28,6 +29,11 @@
   4. Add Frame number reading to all Frame loading routines
 *)
 
+
+(* ToDo for TIF :
+    1. ImageSize returns list of sizes. Need to catch this.
+    2. "FrameCount" does not work, must use	"ImageCount"
+*)
 
 (* ::Section:: *)
 (* Package Declarations*)
@@ -112,16 +118,26 @@ VideoAddProcessRawFrame[fn_] := Module[{},
 
 VideoFile[] := videoFile;
 
+VideoLength[] := numberOfFrames;
+
+VideoDimensions[] := dimensions;
+
 VideoSelect[file_String] := 
 	If[ FileExistsQ@file, PrepareVideoInput[file],	Message[VideoSelect::nofile, file] ];
 VideoSelect[] := VideoSelect[ SystemDialogInput["FileOpen", Directory[]] ];
 
 PrepareVideoInput[file_String] := Module[ {img, modifyFrameID},
-  numberOfFrames = import[file, {"FrameCount"}];
-  dimensions = import[file, {"ImageSize"}]; 
+  If[FileExtension[file] == "tif" || FileExtension[file] == "tiff" ],
+    (* TIFF support *)
+    numberOfFrames = import[file, {"ImageCount"}];
+    dimensions = import[file, {"ImageSize",1}] ,
+    (* else: AVI *)
+    numberOfFrames = import[file, {"FrameCount"}];
+    dimensions = import[file, {"ImageSize"}]
+  ];
   videoFile = file;
   framesIds = Range@numberOfFrames;
-  ROISelect[{{0,0}, dimensions } ];
+  ROISelect[{{0,0}, VideoDimensions[] } ];
   preprocessRawFrames = {};
   If[ OptionValue[VideoIO, "FrameIdFromFrame"], (*try reading frame ids along the way?*)
     modifyFrameID[no_Integer, img_Image] := (framesIds[[no]] = VideoReadFrameID[img]);
@@ -129,11 +145,8 @@ PrepareVideoInput[file_String] := Module[ {img, modifyFrameID},
   ];
   VideoClearBuffer[];
   FileNameTake[file] <> " has "<>ToString@numberOfFrames <> 
-    " frames and is "<> ToString@dimensions[[1]] <>"x"<>ToString@dimensions[[2]]
+    " frames and is "<> ToString@VideoDimensions[][[1]] <>"x"<>ToString@VideoDimensions[][[2]]
 ];
-
-VideoLength[] := numberOfFrames;
-
 
 (* Descrption:
     The buffer loads cropped images into the memory - it does that in a separate processor 
