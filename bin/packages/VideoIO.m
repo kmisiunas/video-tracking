@@ -147,8 +147,8 @@ VideoGet[range_?VectorQ] := VideoGet/@range;
 VideoGet[frame_Integer, "NoBuffer"] := VideoProcessRawFrame[frame, #] &@ VideoGetRaw@frame;
 VideoGet[range_?VectorQ, "NoBuffer"] := VideoProcessRawFrame @@ # &/@ ({#, VideoGetRaw[#]} &/@ range);
 
-VideoGetRaw[frame_Integer] := import[ VideoFile[], {"Frames", frame} ];
-VideoGetRaw[range_?VectorQ] := import[ VideoFile[], {"Frames", range} ];
+VideoGetRaw[frame_Integer] := import[ VideoFile[], {"ImageList", frame} ];
+VideoGetRaw[range_?VectorQ] := import[ VideoFile[], {"ImageList", range} ];
 
 VideoFrameID[] := framesIds;
 VideoFrameID[no_Integer] := framesIds[[no]];
@@ -211,7 +211,7 @@ VideoBufferAllUsingImport[] := Module[ {size,expectedNoOfFrames, chuncks, imageB
     bufferVideo = Table[ (*parallel?*)
       (*compute on chunks of frames here*)
       VideoProcessRawFrame @@ # &/@ Transpose[ {chuncks[[i]]  ,
-        Import[ VideoFile[] , {"Frames", chuncks[[i]]} ]} ]
+        Import[ VideoFile[] , {"ImageList", chuncks[[i]]} ]} ]
       ,
       {i, Length[chuncks]}
     ],
