@@ -24,8 +24,8 @@ BeginPackage["BackgroundEstimate`", {"VideoIO`"}]
 BackgroundCurrent::usage = 
   "BackgroundCurrent[] return stored background image"
 
-BackgroungUpdate::usage = 
-  "BackgroungUpdate[img_ | range_ | None-> Automatic] updates stored background image"
+BackgroundUpdate::usage = 
+  "BackgroundUpdate[img_ | range_ | None-> Automatic] updates stored background image"
 
 BackgroundFnSmartMean::usage = 
   "BackgroundFnSmartMean[range_] estimates mean background image using smart algorithm"
@@ -36,8 +36,11 @@ BackgroundFnMean::usage =
 BackgroundFnMedian::usage = 
   "BackgroundFnMedian[range_] estimates background image using median over specified range"
 
+BackgroundFnMedianSubsample::usage = 
+  "Same as BackgroundFnMedian, but takes only 600 random images"
+
 Options[BackgroundEstimate] = { 
-    "BackgroundFunction" -> BackgroundFnSmartMean (*determine which background computation algorithm to use*),
+    "BackgroundFunction" -> BackgroundFnMedianSubsample (*determine which background computation algorithm to use*),
 }
 
 (* ::Section:: *)
@@ -47,25 +50,28 @@ Begin["`Private`"]
 
 BackgroundCurrent[] := background
 
-BackgroungUpdate[img_Image]:= ( background = img );
+BackgroundUpdate[img_Image]:= ( background = img );
 
 (*updates bg with safety fall back to mean bg algorithm*)
-BackgroungUpdate[range_?VectorQ] := 
-  BackgroungUpdate @ Quiet @ Check[ 
+BackgroundUpdate[range_?VectorQ] := 
+  BackgroundUpdate @ Quiet @ Check[ 
     OptionValue[BackgroundEstimate, "BackgroundFunction"] @ range , 
-        Print@"Background Estimate: initial algorithm failed, using backup BackgroundFnMedian algorithm";
+        Print@"Background Estimate: initial algorithm failed, using backup BackgroundFnMedian algorithm";insta
         BackgroundFnMedian @ range
     ];
 
 (*automatic background updater*)
-BackgroungUpdate[] := BackgroungUpdate @ Range @ VideoLength[];
+BackgroundUpdate[] := BackgroundUpdate @ Range @ VideoLength[];
 
 
 (*=========  Algorithms  ========*)
 
-BackgroundFnMean[range_?VectorQ] := Image @ Mean[ ImageData /@ (VideoGet @ range) ]
+BackgroundFnMean[range_?VectorQ] := Image @ Mean[ ImageData /@ (VideoGet @ range) ] ;
 
-BackgroundFnMedian[range_?VectorQ] := Image @ Median[ ImageData /@ (VideoGet @ range) ]
+BackgroundFnMedian[range_?VectorQ] := Image @ Median[ ImageData /@ (VideoGet @ range) ] ;
+
+BackgroundFnMedianSubsample[range_?VectorQ] := 
+  Image @ Median[ ImageData /@ (VideoGet @ RandomSample[range, Min[600, Length@range]] ) ] ;
 
 (*  Algorithm averages not moving parts of the image over many frames
     Not buffered to allow mean image for large video files that are sparsely sampled

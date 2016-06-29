@@ -19,6 +19,8 @@
                            Updated the sub pixel fitting routines 
                            Added ExpandBox[] method because Gaussian fitting prefers larger areas *)
 (*Version 3.1 (2015-12-15) - Increased rounding of output to 0.001 to better account for errors *)
+(*Version 3.2 (2016-01-08) - Changed method for FindFit[] to avoid errors that occures 2.7% of the times.
+                             See Piezo tracking tests for more info. *)
 
 (*== Specs ==*)
 (* Output: List of {x,y,z, correctness, size*, angle*, flattening*} *)
@@ -77,37 +79,31 @@ ExpandBox[box_, add_] := {
 
 (*Main fitting methods - tested on 2015-03-06*)
 
-SPFGaussianFixed[img_Image] := Block[
-  {data, fit, performFit, a, y, x, mx, my, s, dimensions, 
-   failedResults},
+SPFGaussianFixed[img_Image] := Module[
+  {data, fit, performFit, a, y, x, mx, my, s, dimensions, failedResults},
   data = ImageToList[img];
   dimensions = ImageDimensions[img];
   performFit := FindFit[data,
     a Exp@(-(-my + y)^2/(2 (s^2)) - (-mx + x)^2/(2 s^2)),
-    {{a, Max@data}, {mx, dimensions[[1]]/2}, {my, 
-      dimensions[[2]]/2}, {s, Mean@dimensions/2}}, {x, y},
-    AccuracyGoal -> 3, PrecisionGoal -> 3];
-  failedResults := {dimensions[[1]]/2 , dimensions[[2]]/2, 0 , 
-    dimensions[[2]]/2};
+    {{a, Max@data}, {mx, dimensions[[1]]/2}, {my, dimensions[[2]]/2}, {s, Mean@dimensions/2}}, {x, y},
+    AccuracyGoal -> 3, PrecisionGoal -> 3, Method-> "LevenbergMarquardt"];
+  failedResults := {dimensions[[1]]/2 , dimensions[[2]]/2, 0 , dimensions[[2]]/2, 0.};
   fit = Quiet[Check[performFit, Return@failedResults]];
   {mx, my, s} = {mx, my, s} /. fit ;
   (*deal with errors*)
-  
-  If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || 
-    my >= dimensions[[2]] || s > 0.66*Mean@dimensions, 
+  If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || my >= dimensions[[2]] || s > 0.66*Mean@dimensions,
    Return@failedResults];
   (*format the reply*)
   {mx - 0.5, my - 0.5, 0,
    (*fit quality*)
-   1,
+   1.,
    (*size*)
    Abs[s]
    }
-  ]
+];
 
-SPFGaussianOptimised[img_Image] := Block[
-  {data, fit, performFit, a, angle, y, x, mx, my, sx, sy, dimensions, 
-   p, mx0, my0},
+SPFGaussianOptimised[img_Image, method_:"LevenbergMarquardt"] := Module[
+  {data, fit, performFit, a, angle, y, x, mx, my, sx, sy, dimensions, p, mx0, my0},
   data = ImageToList[img];
   dimensions = ImageDimensions[img];
   (*find early position guess - centroid*)
@@ -117,42 +113,35 @@ SPFGaussianOptimised[img_Image] := Block[
   my0 = data[[All, 2]]~Dot~p;
   (*define fit*)
   performFit := FindFit[data,
-    a E^(-(((-my + y) Cos[angle] - (-mx + x) Sin[
-                angle])^2/(2 sy^2)) - ((-mx + x) Cos[
-              angle] + (-my + y) Sin[angle])^2/(2 sx^2)),
-    {{a, Max@data}, {angle, 0.0}, {mx, mx0}, {my, my0}, {sx, 
-      dimensions[[1]]/2}, {sy, dimensions[[2]]/2}}, {x, y},
-    AccuracyGoal -> 3, PrecisionGoal -> 3];
+    a Exp[-(((-my + y) Cos[angle] - (-mx + x) Sin[angle])^2/(2 sy^2)) -
+           ((-mx + x) Cos[angle] + (-my + y) Sin[angle])^2/(2 sx^2)   ] ,
+    (*great initial guess*)
+    {{a, Max[data]}, {angle, 0.0}, {mx, mx0}, {my, my0}, {sx, dimensions[[1]]/2}, {sy, dimensions[[2]]/2}},
+    {x, y},
+    AccuracyGoal -> 3, PrecisionGoal -> 3, Method -> method];
   (*fit*)
   fit = Quiet[Check[performFit, $Failed]];
   (*if failed use simpler routine to find at least the positions*)
-  
-  If[fit === $Failed, Return@SPFGaussianFixed[img] ];
+  If[fit === $Failed , Return@SPFGaussianFixed[img] ];
   {mx, my, sx, sy, angle} = {mx, my, sx, sy, angle} /. fit ;
   (*check parameters - if off use simpler routine*)
-  
-  If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || 
-    my >= dimensions[[2]] || sx > 0.77*dimensions[[1]] || 
-    sy > 0.77*dimensions[[2]],
-    Return@SPFGaussianFixed[img] ];
-  If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || 
-    my >= dimensions[[2]] || sx > 0.77*dimensions[[1]] || 
-    sy > 0.77*dimensions[[2]],
-    Print@"you should never read this message"];
+  If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || my >= dimensions[[2]], Return@SPFGaussianFixed[img] ];
+  If[Sqrt@Abs[sx*sy] < 0.9 && method == "NMinimize",Return@SPFGaussianFixed[img]  ];
+  If[Sqrt@Abs[sx*sy] < 0.9 , Return@SPFGaussianOptimised[img, "NMinimize"] (*slow and powerful*) ];
   (*format the otput*)
   {
    (*position*)
-   mx - 0.5, my - 0.5, 0,
+   mx - 0.5, my - 0.5, 0.,
    (*fit quality*)
-   1 (*bad one elliminated for tother routines*),
+   1 (*todo*),
    (*size*)
    Sqrt@Abs[sx *sy],
    (*angle*)
    Mod[If[sx > sy, angle, angle + Pi/2.0], N@Pi],
    (*flattening*)
    1.0 - Abs@If[sx > sy, sy/sx, sx/sy]
-   }
-  ]
+  }
+];
 
 
 

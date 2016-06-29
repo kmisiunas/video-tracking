@@ -73,6 +73,10 @@ VideoClearBuffer::usage =
 VideoLength::usage =
   "VideoLength[] returns number of frames in buffered video";
 
+VideoDimensions::usage =
+    "VideoDimensions[] returns the dimensions of current video file";
+
+
 VideoAddProcessRawFrame::usage = 
   "VideoAddProcessRawFrame[ func[no_Integer, img_Image] ] allows to add pre-processing step 
   that is called each time Raw frame is processed in early stages (good for additional operations)";
