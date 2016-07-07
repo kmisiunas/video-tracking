@@ -17,15 +17,25 @@
 BeginPackage["Linking`", {"SortedLists`"}]
 (* Exported symbols added here with SymbolName::usage *)
 
-LinkingFindPossibilities::usage = "";
+LinkingFindPossibilities::usage =
+    "LinkingFindPossibilities[starts_, endings_, (options)] discovers all possible links";
 
 LinkingFormatTracks::usage = "";
 
-LinkingAlgorithm::usage = "";
+LinkingAlgorithm::usage =
+    "LinkingAlgorithm[starts_, endings_, (options)] performs linking betwen starts and ends.
+    |Use Linking[] for a user friendly exprerience";
 
-Linking::usage = "";
+Linking::usage =
+    "Linking[points|tracks, (options)] performs data linking.
+    |Options:
+    | - ";
 
-LinkingExplodeTrack::usage = "";
+LinkingExplodeTrack::usage = "LinkingExplodeTrack[points|tracks, (options)]";
+out
+(* Cost functions *)
+
+LinkingCostFnStandard::usage = "Cost function optimised for particle diffusion in channels"
 
 (* Option parameters *)
 
@@ -47,7 +57,7 @@ Begin["`Private`"]
 allLinkingOptions := {
   LinkingDebug-> False,
   LinkingMaxDt -> 5,
-  LinkingCostFn -> (0.25 (#2[[1]] - #1[[1]] - 1) + 0.1 EuclideanDistance[#2[[{2, 3, 4}]], #1[[{2, 3, 4}]]] &),
+  LinkingCostFn -> LinkingCostFnStandard,
   LinkingStartId -> 1
 };
 
@@ -147,6 +157,23 @@ Linking[tracks_Association, opts: OptionsPattern[]] := Module[
   oldLinks = Flatten[ LinkingExplodeTrack/@Values[tracks] , 1 ];
   LinkingFormatTracks[ Join[newLinks,oldLinks] ,opts ]
 ];
+
+
+
+(* === Common linking Cost Functions === *)
+
+LinkingCostFnStandard := (0.25 (#2[[1]] - #1[[1]] - 1) + 0.1 EuclideanDistance[#2[[{2, 3, 4}]], #1[[{2, 3, 4}]]] &)
+
+(* Uses the distribution of detectionsto deterimne where particles are likely to exit and enter the channel*)
+(* only works with channels along the x axis*)
+LinkingCostFnChannel[points_:{___List}] := Module[
+  {interval},
+  {interval} = Interval @ Quantile[  Flatten[points[[ All, 2]]  ] , {1/10, 9/10}];
+  ( If[IntervalMemberQ[interval, #1[[2]]], 0.2, 1] *
+      ( 0.25 (#2[[1]] - #1[[1]] - 1) + 0.1 EuclideanDistance[#2[[{2, 3, 4}]], #1[[{2, 3, 4}]]] )
+        &)
+]
+
 
 
 End[] (* `Private` *)
