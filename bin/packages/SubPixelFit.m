@@ -92,14 +92,14 @@ SPFGaussianFixed[img_Image] := Module[
   {mx, my, s} = {mx, my, s} /. fit ;
   (*deal with errors*)
   If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || my >= dimensions[[2]] || s > 0.66*Mean@dimensions,
-   Return@failedResults];
+    Return@failedResults];
   (*format the reply*)
   {mx - 0.5, my - 0.5, 0,
-   (*fit quality*)
-   1.,
-   (*size*)
-   Abs[s]
-   }
+    (*fit quality*)
+    1.,
+    (*size*)
+    Abs[s]
+  }
 ];
 
 SPFGaussianOptimised[img_Image, method_:"LevenbergMarquardt"] := Module[
@@ -126,20 +126,20 @@ SPFGaussianOptimised[img_Image, method_:"LevenbergMarquardt"] := Module[
   {mx, my, sx, sy, angle} = {mx, my, sx, sy, angle} /. fit ;
   (*check parameters - if off use simpler routine*)
   If[mx <= 0 || mx >= dimensions[[1]] || my <= 0 || my >= dimensions[[2]], Return@SPFGaussianFixed[img] ];
-  If[Sqrt@Abs[sx*sy] < 0.9 && method == "NMinimize",Return@SPFGaussianFixed[img]  ];
-  If[Sqrt@Abs[sx*sy] < 0.9 , Return@SPFGaussianOptimised[img, "NMinimize"] (*slow and powerful*) ];
+  (* when partilce size is small, it typically indicates fitting error *)
+  If[Sqrt@Abs[sx*sy] < 0.9, Return@SPFGaussianFixed[img]  ];
   (*format the otput*)
   {
-   (*position*)
-   mx - 0.5, my - 0.5, 0.,
-   (*fit quality*)
-   1 (*todo*),
-   (*size*)
-   Sqrt@Abs[sx *sy],
-   (*angle*)
-   Mod[If[sx > sy, angle, angle + Pi/2.0], N@Pi],
-   (*flattening*)
-   1.0 - Abs@If[sx > sy, sy/sx, sx/sy]
+    (*position*)
+    mx - 0.5, my - 0.5, 0.,
+    (*fit quality*)
+    1 (*todo*),
+    (*size*)
+    Sqrt@Abs[sx *sy],
+    (*angle*)
+    Mod[If[sx > sy, angle, angle + Pi/2.0], N@Pi],
+    (*flattening*)
+    1.0 - Abs@If[sx > sy, sy/sx, sx/sy]
   }
 ];
 
