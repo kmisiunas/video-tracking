@@ -28,9 +28,6 @@ VideoFindThreshold::usage =
 VideoFindActiveFrames::usage =
   "VideoFindActiveFrames[scanDensity_= auto] shows where active frames are inside the video"
 
-VideoReadFrameID::usage =
-  "VideoReadFrameID[image_] returns video frame ID from 4 pixels in top right corrner of a frame"
-
 VideoDetectVibrations::usage = 
   "VideoDetectVibrations[] first call initiates the routine, second call returns vibration count on raw frames"
 
@@ -83,11 +80,6 @@ VideoFindActiveFrames[scanDensity_Integer] := Module[
 
 VideoFindActiveFrames[] := VideoFindActiveFrames[ Round[ VideoLength[]/1000 ]]
 
-(*============ VideoReadFrameID =============*)
-
-toInt[acc_, add_] := acc*256 + add;
-VideoReadFrameID[image_Image] :=
-    Fold[ toInt, 0, Reverse @ PixelValue[image, {1;;4, ImageDimensions[image][[2]] }, "Byte"] ]
 
 
 (*============ VideoDetectVibrations =============*)

@@ -15,6 +15,9 @@
                            Changed names of functions to VideoAnalyse and VideoAnalyseFrame 
                            Performance: optimised ComponentMeasurements calls
                            VideoGetForeground: options for different particle types*)
+(*Version 3 (2016-07-07) - Updated to make the analysis more persistant on errors.
+                           If error occusrs, other tracks get a special label to indicate error.
+                           Preparing to move to functional coding by passib around buffer values *)
 
 
 (* ::Section:: *)
@@ -73,6 +76,7 @@ Options[VideoTracking] = {
     "ForegroundMethod" -> "Bright" (*method for separating foreground from background*)
 }
 
+Print["Warrning: You should use packege PartcleTracking instead. This package is depricated"];
 
 (* ::Section:: *)
 (* Implementations - Background*)
@@ -98,7 +102,7 @@ VideoFrameBinarize[img_Image] := Switch[ OptionValue[VideoTracking,"Threshold"],
 ]
 
 
-FindParticles[img_Image] := ComponentMeasurements[ img,
+FindParticles[img_Image, opts: OptionsPattern[]] := ComponentMeasurements[ img,
   (*properties to read*)
   {"Area", "Elongation", "AdjacentBorderCount"}, (*"todo: perimeter for checking of shape is convex"*)
   (*filter out too small particles*)
@@ -108,7 +112,7 @@ FindParticles[img_Image] := ComponentMeasurements[ img,
 WithinRangeQ[value_?Internal`RealValuedNumericQ, {min_, max_}] := min <= value <= max
 
 (*input from FindParticles*)
-SelectSingleParticles[list_] := Select[ list, 
+SelectSingleParticles[list_, opts: OptionsPattern[]] := Select[ list,
   (*area*)
   #[[2,1]] ~ WithinRangeQ ~ OptionValue[VideoTracking, "FilterArea"] &&
   (*elongation*)
@@ -136,7 +140,8 @@ ReportOverlapOccurances[list_?VectorQ, frame_Integer] :=
 
 
 (* ::Section:: *)
-(*Implementations - Computation Execution and Distribution *)
+(*klementations - Computation Execution and Distribution *)
+
 
 (*output list of {t, x,y,...} *)
 VideoAnalyseFrame[frame_Integer] := Block[
@@ -165,6 +170,12 @@ VideoAnalyse[range_?VectorQ] := Module[
 ]
 
 VideoAnalyse[] := VideoAnalyse @ Range @ VideoLength[]
+
+
+
+
+
+
 
 
 (* ::Section:: *)

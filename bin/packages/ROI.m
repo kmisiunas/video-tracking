@@ -12,6 +12,7 @@
 (*This package aims to manage video import buffering and saving*)
 (*Version 2.0 (2015-03-09) - Exported from VideoIO.m package 
                              Compatibility with Mathematica's region specification*)
+(*Version 3.0 (2016-07-07) - No variables stored in background -> all variables are retured *)
 
 (* ==Specs== *)
 (*Make ROI the same as Mathematica in built function: { lower left corner, top right corner} *)
@@ -20,11 +21,11 @@
 (* Package Declarations*)
 
 
-BeginPackage["ROI`", {"FFmpeg`", "VideoIO`"}]
+BeginPackage["ROI`", {"FFmpeg`"}]
 
 (* ---  ROI functions  --- *)
 
-ROISelect::usage = 
+ROISelect::usage =
 		"UI for Region Of Interest selection"
 
 ROIShow::usage = 
@@ -32,9 +33,6 @@ ROIShow::usage =
 
 ROIImageTake::usage = 
 		"ROIImageTake[img_, roi_:ROICurrent]  returns a smaller image that was cut with rectangular ROI (not final!)"
-
-ROICurrent::usage = 
-	"active region of interest for the analysis {{x0,y0},{x1,y1}}."
 
 ROIFullImage::usage = 
 	"ROIFullImage[] returns ROI for entire raw video"
@@ -56,33 +54,19 @@ Begin["`Private`"]
 (*ROI function implementations*)
 
 
-currentROI = {{0,0}, {0,0}}; 
+ROISelect[filename_, roiOld_:{}] := Module[
+  {width, height, img, pos, rawWidth, rawHeight, roi},
 
-ROICurrent[] := currentROI
-
-ROIQ[roi_] := MatchQ[roi, {{_Integer, _Integer}, {_Integer, _Integer}}]
-
-ROISelect[roi_?ROIQ] := Module[{}, 
-  currentROI = roi;
-  ClearBuffer[]; (*must reset buffer because places changed*)
-  roi 
-] 
-
-ROISelect[] := Module[
-  {width, height, img, pos, rawWidth, rawHeight}, 
-
-  img = VideoIO`VideoGetRaw[1];
+  img = FFImport[filename, {"ImageList", 1}];
   {rawWidth, rawHeight} = ImageDimensions[img];
-  {width, height} = ROIDimmensions@ROICurrent[];
-  pos = Round[ (ROICurrent[][[1]] + ROICurrent[][[2]])/2 ];
+  roi = If[ROIQ[roiOld], roiOld, {{0,0}, {rawWidth, rawHeight}} ];
+  {width, height} = ROIDimmensions@roi;
+  pos = Round[ (roi[[1]] + roi[[2]])/2 ];
+  Speak["Please select region of intrest."];
 
- 
  DialogInput[DialogNotebook[
    {
-    Button["Select ROI",
-     DialogReturn@ROISelect@ROICreateRect[Round@pos, {width, height}]  ],
-
-    Panel[ Grid@Transpose@{{
+     Grid[Transpose@{{
          Row[{
            Panel@Grid[{
               {TextCell["ROI Position"]},
@@ -105,8 +89,10 @@ ROISelect[] := Module[
                Manipulator[
                 Dynamic@height, 
                 {1, rawHeight, 1}], Dynamic@height}
-              }]
-           }, " "],
+              }],
+           Button["Select\nROI", DialogReturn@ROICreateRect[Round@pos, {width, height}] ,
+             ImageSize-> {Automatic, 70} , Alignment -> Center]
+           },  " ", Alignment -> {Center,	Center}],
 
          Row[{
          (*image and bounds + (optional) Locator*)
@@ -122,23 +108,26 @@ ROISelect[] := Module[
           ImageTrim[ img, ROICreateRect[ Round@pos, {width, height}] ],
           ImageSize -> Small
         ]
-        }]
+        }, "   "]
          
-      }}]
+      }}
+      ]
     },
    WindowTitle -> "Select Region Of Intrest"
    ]
   ]
  ]
 
+
 ROICreateRect[pos_, size_] := Round @ {
   	{pos[[1]] - Floor[size[[1]]/2], 	pos[[2]] - Floor[size[[2]]/2]},
   	{pos[[1]] + Ceiling[size[[1]]/2], 	pos[[2]] + Ceiling[size[[2]]/2]}
-  }
+  };
 
 
-ROIDimmensions[roi_?ROIQ] := roi[[2]] - roi[[1]]
-ROIDimmensions[] := ROIDimmensions[ ROICurrent[] ]
+ROIDimmensions[roi_?ROIQ] := roi[[2]] - roi[[1]];
+
+ROIQ[roi_] := MatchQ[roi, {{_Integer, _Integer}, {_Integer, _Integer}}];
 
 
 ROIShow[roi_, img_Image] := Block[
@@ -158,16 +147,11 @@ ROIShow[roi_, img_Image] := Block[
       Line@{com - {0, 10}, com + {0, 10}}
     }],
    ImageSize -> Medium]
-  ]
+  ];
 
-ROIShow[roi_: ROICurrent[], frame_Integer: 1] := ROIShow[roi, VideoBufferedImport[frame]];
 
-(*buffered load of image*)
-bufferVideoSingleCmd = {};
-VideoBufferedImport[frame_] := If[frame === bufferVideoSingleCmd,
-  bufferVideoSingle,
-  bufferVideoSingle = VideoGetRaw[frame]; bufferVideoSingleCmd = frame
-]
+
+
 
 (* ::Section:: *)
 (*The End*)

@@ -57,6 +57,7 @@ Begin["`Private`"]
 allLinkingOptions := {
   LinkingDebug-> False,
   LinkingMaxDt -> 5,
+  LinkingMaxDxyz -> 20,
   LinkingCostFn -> LinkingCostFnStandard,
   LinkingStartId -> 1
 };
@@ -148,6 +149,8 @@ Linking[points:{___List}, opts: OptionsPattern[]] := Module[
   ]
 ];
 
+Linking[{}, opts: OptionsPattern[]] := <| |>;
+
 (* for tracks *)
 Linking[tracks_Association, opts: OptionsPattern[]] := Module[
   {newLinks, oldLinks},
@@ -162,7 +165,7 @@ Linking[tracks_Association, opts: OptionsPattern[]] := Module[
 
 (* === Common linking Cost Functions === *)
 
-LinkingCostFnStandard := (0.25 (#2[[1]] - #1[[1]] - 1) + 0.1 EuclideanDistance[#2[[{2, 3, 4}]], #1[[{2, 3, 4}]]] &)
+LinkingCostFnStandard := (0.1 (#2[[1]] - #1[[1]] - 1) + 0.1 EuclideanDistance[#2[[{2, 3, 4}]], #1[[{2, 3, 4}]]] &)
 
 (* Uses the distribution of detectionsto deterimne where particles are likely to exit and enter the channel*)
 (* only works with channels along the x axis*)
