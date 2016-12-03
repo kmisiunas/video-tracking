@@ -19,8 +19,8 @@
 (*Version 3.1 (2015-12-04) - Stable under unexpected FF stream closure  *)
 (*Version 3.2 (2016-01-08) - TIF stack support:
                              Migrated from importing using "Frames" -> "ImageList" for tiff stack support*)
-(*Version 4.0 (2016-01-08) - Moved to Video file format
-                             *)
+(*Version 4.0 (2016-07-07) - Moved to Video file format                        *)
+(*Version 4.1 (2016-12-01) - Usage of Internal`Bag to reduce breaking   *)
 
 (* ::Plan for future::*)
 (*
@@ -105,31 +105,36 @@ normaliseROI[rois : {{{_?NumberQ, _?NumberQ}, {_?NumberQ, _?NumberQ}}, ___}] :=
 (* key importer *)
 Options[ffImportWithROIs] = Options[VideoIO];
 ffImportWithROIs[rois_, filename_String, opts: OptionsPattern[] ] := Module[
-  {dim, stream, res, size, numberOfFrames, expectedNoOfFrames, images},
+  {dim, stream, size, numberOfFrames, expectedNoOfFrames, images, bagImages, bagIds, result},
   expectedNoOfFrames = FFImport[ filename, "FrameCount"];
   {stream, dim} = FFInputStreamAt[ filename, 1, expectedNoOfFrames]; (*might cause error because of order!*)
+  bagImages = Internal`Bag[Range[expectedNoOfFrames]];
+  bagIds =    Internal`Bag[Range[expectedNoOfFrames]];
   Monitor[ (* Show the progress to the user *)
-    res = (* Format { {t, Image(roi1), Image(roi2)___}, image 2 and so on} *)
-        Quiet @ Reap @ Catch @ Do[ (*run though entire file till there is no frames*)
-          Sow @ CheckOutputFormat[i] @ VideoProcessRawFrame[rois, i, FFGetNextFrame[stream, dim], opts ] ,
+    result = (* Format { {t, Image(roi1), Image(roi2)___}, image 2 and so on} *)
+        Quiet @ Catch @ Do[ (*run though entire file till there is no frames*)
+          {Internal`BagPart[bagIds, i], Internal`BagPart[bagImages, i]} =
+              CheckOutputFormat[i] @ VideoProcessRawFrame[rois, i, FFGetNextFrame[stream, dim], opts ] ,
           {i, expectedNoOfFrames}
         ],
-    Row[{"Loading video ", ProgressIndicator[i, {1, expectedNoOfFrames}]}] (* animation: slow? *)
+    Row[{"Loading video ", ProgressIndicator[i, {1, expectedNoOfFrames}]}]
   ]; (*end Monitor*)
   Close[stream];
-  If[Length[res]<2 || Length[res[[2,1]]] < 2 , Message[VideoIO::noFramesLoaded]; Abort[]];
-  images = If[ res[[1]] === Null, res[[2,1]], res[[ 2, 1, ;; res[[1]] ]] ];
-  numberOfFrames = Length[images];
+  (* Check for problems *)
+  If[IntegerQ[result] && result === 0, Message[VideoIO::noFramesLoaded]; Abort[]];
+  If[IntegerQ[result] && result > 0  ,
+    bagIds = Internal`Bag[Internal`BagPart[bagIds, 1;;result]];
+    bagImages = Internal`Bag[Internal`BagPart[bagImages, 1;;result]];
+  ];
   (*warn if there were discrepencied between loaded file amounts*)
-  If[ numberOfFrames =!= expectedNoOfFrames ,
+  If[ Internal`BagLength[bagImages] =!= expectedNoOfFrames ,
     Message[VideoIO::missingFrames, expectedNoOfFrames, numberOfFrames];
     Print @ Style["[Warning] Vidoe file should contain " <> ToString@expectedNoOfFrames <>
-        " frames, but FFmpeg loaded only " <> ToString@numberOfFrames , Red];
+        " frames, but FFmpeg loaded only " <> Internal`BagLength[bagImages] , Red];
   ];
-  (*prepare video files *)
-  FormatVideoOutput[filename, images[[All, 1]] ][ #[[1]], #[[2]] ] &/@ Transpose[
-    {Transpose[images[[All, 2;;]]], rois}
-  ]//First
+  (* prepare video file *)
+  (* todo onlu works with one ROI *)
+  FormatVideoOutputBag[filename, Internal`BagPart[bagIds, All] ][ bagImages, rois[[1]] ]
 ];
 
 
@@ -139,22 +144,32 @@ Options[VideoProcessRawFrame] = Options[VideoIO];
 VideoProcessRawFrame[rois_, no_Integer, img_Image, opts: OptionsPattern[]] := Join[
   {If[ OptionValue["FrameIdFromFrame"], VideoReadFrameID[img], no ]}  ,
   (*images for all rois*)
-  ColorConvert[ ImageTrim[img, # + {{0.5, 0.5}, {-0.5, -0.5}}], "Grayscale"] &/@ rois
+(* todo onlu works with one ROI *)
+  ColorConvert[ ImageTrim[img, # + {{0.5, 0.5}, {-0.5, -0.5}}], "Grayscale"] &/@ rois[[{1}]]
 ];
 
-CheckOutputFormat[no_][in_] := (If[ IntegerQ[in[[1]]] && ImageQ[in[[2]]], in, Throw[no - 1]]) ;
+CheckOutputFormat[no_][in_] := If[ IntegerQ[in[[1]]] && ImageQ[in[[2]]], in, Throw[no - 1]];
 
-FormatVideoOutput[filename_String, ids_][images_, roi_] := Video[<|
+FormatVideoOutputBag[filename_String, ids_][baggedImages_, roi_] := Video[<|
   "File" -> filename,
-  "Images" -> images,
+  "RawBag" -> baggedImages,
   "Ids" -> ids,
-  "Length" -> Length[images],
-  "Size" -> ImageDimensions[First[images]],
-  "ROI" -> roi
+  "Length" -> Internal`BagLength[baggedImages],
+  "Size" -> ImageDimensions[Internal`BagPart[baggedImages, 1]],
+  "ROI" -> roi,
+  "Images" -> "place holder" (*should never see this really*)
 |>];
 
 
-
+FormatVideoOutput[filename_String, ids_][images_, roi_] := Video[<|
+  "File" -> filename,
+  "RawBag" -> Internal`Bag[images],
+  "Ids" -> ids,
+  "Length" -> Length[images],
+  "Size" -> ImageDimensions[First[images]],
+  "ROI" -> roi,
+  "Images" -> "place holder"
+|>];
 
 
 
