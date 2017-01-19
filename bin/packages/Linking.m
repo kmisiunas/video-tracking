@@ -24,12 +24,16 @@ LinkingFormatTracks::usage = "";
 
 LinkingAlgorithm::usage =
     "LinkingAlgorithm[starts_, endings_, (options)] performs linking betwen starts and ends.
-    |Use Linking[] for a user friendly exprerience";
+     Use Linking[] for a user friendly exprerience";
 
 Linking::usage =
     "Linking[points|tracks, (options)] performs data linking.
-    |Options:
-    | - ";
+     Options:
+      - LinkingMaxDt 
+      - LinkingMaxDxyz
+      - LinkingStartId
+      - LinkingCostFn
+      - LinkingDebug";
 
 LinkingExplodeTrack::usage = "LinkingExplodeTrack[points|tracks, (options)]";
 out
@@ -41,6 +45,8 @@ LinkingCostFnStandard::usage = "Cost function optimised for particle diffusion i
 
 LinkingMaxDt::usage =
     "Option: maximum number of frames to consider when linking trajectories (default is 10)";
+LinkingMaxDxyz::usage =
+    "Option: maximum distance to even consider linking. To improve performance (default is 20)";
 LinkingDebug::usage =
     "Option: prints additional information fr debuging the code (default is False)";
 LinkingStartId::usage =
@@ -56,7 +62,7 @@ Begin["`Private`"]
 (* === Options === *)
 allLinkingOptions := {
   LinkingDebug-> False,
-  LinkingMaxDt -> 5,
+  LinkingMaxDt -> 10,
   LinkingMaxDxyz -> 20,
   LinkingCostFn -> LinkingCostFnStandard,
   LinkingStartId -> 1
@@ -68,7 +74,7 @@ allLinkingOptions := {
 Options[LinkingFindPossibilities] = allLinkingOptions;
 
 LinkingFindPossibilities[starts_, endings_, opts: OptionsPattern[]] := Module[
-  {p1, p2, p2t, minIds, maxIds},
+  {p1, p2, p2t, minIds, maxIds, potential},
   (* sort first by time *)
   p1 = SortBy[starts, First];
   p2 = SortBy[endings, First];
@@ -77,10 +83,12 @@ LinkingFindPossibilities[starts_, endings_, opts: OptionsPattern[]] := Module[
   minIds = BinarySearchUp[p2t, # + 1] & /@ p1[[All, 1]];
   maxIds = BinarySearchDown[p2t, # + OptionValue[LinkingMaxDt] ] & /@ p1[[All, 1]];
   (* create all posible links *)
-  Flatten[ Table[
+  potential = Flatten[ Table[
     (Start[p1[[i]]] -> Ending[p2[[#]]]) &/@ Range[minIds[[i]], maxIds[[i]] ],
     {i, Length[starts]}
-  ] , 1 ]
+  ] , 1 ];
+  (* filter distances *)
+  Select[ potential, EuclideanDistance[ #[[1,1, {2,3,4}]] , #[[2,1, {2,3,4}]] ] <= OptionValue[LinkingMaxDxyz] &]
 ] ;
 
 

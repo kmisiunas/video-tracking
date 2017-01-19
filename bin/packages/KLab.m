@@ -33,19 +33,20 @@ BeginPackage["KLab`", {"Linking`"}];
 
 (*important*)
 KLab::usage =
-  "Import[file, \"Tracks\"] imports tracks from json of zipped json file.
-  |Import[file, \"Tracks\", \"Info\" -> True] gets meta data descriptions for the track
-  |Import[file, \"Tracks\", \"PrintInfo\" -> True] prints metadata to screen";
+ "Import[file, \"Tracks\"] imports tracks from json of zipped json file.
+  Import[file, \"Tracks\", \"Info\" -> True] gets meta data descriptions for the track
+  Import[file, \"Tracks\", \"PrintInfo\" -> True] prints metadata to screen
+  Export[file (with zip or json), tracks, \"KLab\", (options)] exports the file in a compact way";
 
 KLab::invalidTrack = "Suplied trach does not conform to KLab standard format.";
 KLab::unrecognisedExportExtenssion = "Please use .json or .zip extenssion";
 KLab::commandDeprecated =
-    "Command no longer supported. Use Import[ file, \"Klab\" , \"Info\" -> True, \"PrintInfo\" -> True] instead ";
+  "Command no longer supported. Use Import[ file, \"Klab\" , \"Info\" -> True, \"PrintInfo\" -> True] instead ";
 KLab::jsonFormatError = "Problem detected with internal json specification. No version supplied.";
 
 TrackAssembly::usage =
     "TrackAssembly[tracks_] links multiple tracks into one assembly
-    |TrackAssembly[tracks_, \"\"] links multiple tracks into one assembly";
+    TrackAssembly[tracks_, \"\"] links multiple tracks into one assembly";
 
 TrackAssembly::noOfFramesChanged =
     "Number of frames changed during TrackAssembly[] from `1` to `2`."

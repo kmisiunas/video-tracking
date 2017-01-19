@@ -5,4 +5,6 @@ video-tracking.iml
 bin/video-tracking-ui - Copy.nb
 bin/video-tracking-ui - Copy 3.nb
 bin/.idea/*
+saveState.wl
+*.DS_Store
 
